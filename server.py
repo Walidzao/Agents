@@ -9,6 +9,10 @@ from google.genai import types
 import config as cfg
 from call_funtion import call_function, available_functions
 
+# Parameterize the base path
+WORKSPACES_BASE = "/workspaces"
+os.makedirs(WORKSPACES_BASE, exist_ok=True)
+
 class RunRequest(BaseModel):
     prompt: str
     workspace: Optional[str] = None
@@ -19,11 +23,21 @@ app = FastAPI()
 
 @app.post("/v1/run")
 def run(req: RunRequest):
-    # Quick path: single-tenant. For multi-tenant, refactor to pass workspace through args.
-    if req.workspace:
-        if ".." in req.workspace or req.workspace.startswith("/"):
-            raise HTTPException(400, "Invalid workspace path")
-        cfg.WORKING_DIRECTORY = req.workspace  # note: global, single-tenant only
+    # Set up workspace directory
+    workspace_root = WORKSPACES_BASE
+    if not req.workspace:
+        raise HTTPException(400, "workspace is required")  # or create a default per-session workspace
+
+    base_real = os.path.realpath(WORKSPACES_BASE)
+    candidate = os.path.realpath(os.path.join(WORKSPACES_BASE, req.workspace))
+    if not candidate.startswith(base_real + os.sep):
+        raise HTTPException(400, "Invalid workspace path")
+    os.makedirs(candidate, exist_ok=True)
+    workspace_root = candidate
+
+   
+
+
 
     load_dotenv()
     api_key = os.environ.get("GEMINI_API_KEY")
@@ -54,7 +68,8 @@ def run(req: RunRequest):
         if resp.function_calls:
             tool_parts = []
             for fc in resp.function_calls:
-                tool_parts.extend(call_function(fc, req.verbose).parts)
+                tool_result = call_function(fc, req.verbose, workspace_root)
+                tool_parts.extend(tool_result.parts)
             messages.append(types.Content(role="tool", parts=tool_parts))
             continue
 

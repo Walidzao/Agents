@@ -16,3 +16,5 @@ All paths you provide should be relative to the working directory. You do not ne
 """
 
 max_iterations = 10
+
+LOCAL_MODE = False
