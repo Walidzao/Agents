@@ -9,3 +9,10 @@ wheels/
 # Virtual environments
 .venv
 .env
+
+# Local artifacts and workspaces
+workspaces/
+project.zip
+.last_ws*
+cloudflared.log
+{workspace_id*}
