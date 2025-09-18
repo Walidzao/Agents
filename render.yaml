@@ -14,11 +14,6 @@ services:
       - key: GEMINI_API_KEY
         sync: false         # set this secret in Render dashboard
       - key: WORKSPACES_BASE
-        value: /workspaces  # persistent disk mount point
-
-    disk:
-      name: workspaces
-      mountPath: /workspaces
-      sizeGB: 1
+        value: /tmp/workspaces  # free tier has no disks; this is ephemeral
 
 
