@@ -1,0 +1,24 @@
+# Render Blueprint: deploys the FastAPI service from the Dockerfile
+
+services:
+  - type: web
+    name: agents-assistant
+    env: docker
+    plan: free
+    region: frankfurt  # change if you prefer another region
+    dockerfilePath: ./Dockerfile
+    autoDeploy: true
+    healthCheckPath: /healthz
+
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false         # set this secret in Render dashboard
+      - key: WORKSPACES_BASE
+        value: /workspaces  # persistent disk mount point
+
+    disk:
+      name: workspaces
+      mountPath: /workspaces
+      sizeGB: 1
+
+
