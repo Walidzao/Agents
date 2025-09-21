@@ -2,13 +2,13 @@ import os
 from google.genai import types
 
 def get_files_info(working_directory, directory="."):
-    #construct the asolute working dir from the provided path. 
-    abs_working_directory = os.path.abspath(working_directory)
+    # Construct the absolute working dir from the provided path
+    abs_working_directory = os.path.realpath(working_directory)
 
-    #this line normalizes the directory path to be a full path
-    abs_directory = os.path.abspath(os.path.join(abs_working_directory, directory))
+    # This line normalizes the directory path to be a full path
+    abs_directory = os.path.realpath(os.path.join(abs_working_directory, directory))
 
-    if not abs_directory.startswith(abs_working_directory):
+    if not abs_directory.startswith(abs_working_directory + os.sep):
         return f'Error: Cannot list "{directory}" as it is outside the permitted working directory'
 
     if not os.path.isdir(abs_directory):
