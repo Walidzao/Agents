@@ -1,4 +1,6 @@
 from fastapi import FastAPI, HTTPException, UploadFile, File, Query
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from typing import Optional
 import os
@@ -30,6 +32,22 @@ class CloneRequest(BaseModel):
     branch: Optional[str] = "main"
 
 app = FastAPI()
+
+# Enable CORS for browser-based UI
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Serve the simple web UI from the same origin to avoid CORS entirely
+try:
+    app.mount("/ui", StaticFiles(directory="web", html=True), name="ui")
+except Exception:
+    # If the directory is missing locally, skip mounting; in container it exists
+    pass
 
 @app.get("/healthz")
 def healthz():

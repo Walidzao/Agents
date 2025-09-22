@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Agentic Code Assistant UI</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="container">
+    <h1>Agentic Code Assistant</h1>
+
+    <div class="card">
+      <h2>Backend</h2>
+      <input id="baseUrl" type="text" value="https://agents-assistant-qwcl.onrender.com" />
+      <button id="healthBtn">Check Health</button>
+      <pre id="healthOut"></pre>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <h2>Upload Workspace (ZIP)</h2>
+        <input id="zipFile" type="file" accept=".zip" />
+        <button id="uploadBtn">Upload</button>
+        <pre id="uploadOut"></pre>
+      </div>
+
+      <div class="card">
+        <h2>Clone Workspace (Git)</h2>
+        <input id="repoUrl" type="text" placeholder="https://github.com/user/repo.git" />
+        <input id="branch" type="text" value="main" />
+        <button id="cloneBtn">Clone</button>
+        <pre id="cloneOut"></pre>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Workspace</h2>
+      <label>workspace_id</label>
+      <input id="ws" type="text" placeholder="paste workspace_id here" />
+      <div class="grid">
+        <div>
+          <button id="treeBtn">List Tree</button>
+          <pre id="treeOut" class="scroll"></pre>
+        </div>
+        <div>
+          <input id="filePath" type="text" placeholder="path e.g. calculator/README.md" />
+          <button id="fileBtn">Read File</button>
+          <pre id="fileOut" class="scroll"></pre>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Run (Prompt)</h2>
+      <textarea id="prompt" rows="5" placeholder="Type your prompt here..."></textarea>
+      <button id="runBtn">Send</button>
+      <pre id="runOut" class="scroll"></pre>
+    </div>
+  </div>
+
+  <script src="main.js"></script>
+  </body>
+  </html>
+
+
