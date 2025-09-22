@@ -8,6 +8,7 @@ h1 { margin: 0 0 16px; font-size: 24px; }
 input, textarea { width: 100%; background: #0e1630; color: #e6e8ef; border: 1px solid #2a3a70; border-radius: 8px; padding: 8px; margin: 6px 0; }
 button { background: #2f6bed; color: white; border: 0; border-radius: 8px; padding: 8px 12px; cursor: pointer; }
 button:hover { background: #2657c0; }
-pre { white-space: pre-wrap; word-wrap: break-word; background: #0e1630; padding: 8px; border-radius: 8px; border: 1px solid #2a3a70; }
+/* Preserve code indentation exactly; scroll horizontally for long lines */
+pre { white-space: pre; overflow: auto; background: #0e1630; padding: 8px; border-radius: 8px; border: 1px solid #2a3a70; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
 .scroll { max-height: 280px; overflow: auto; }
 

@@ -99,6 +99,92 @@ RERROR=$(curl -sS -X POST "$BASE/v1/run" \
 echo "$RERROR"
 echo "$RERROR" | grep -Eiq 'error|invalid|negative' || echo "Note: error handling test may need verification; review output above"
 
+# ADDITIONAL CODE ASSISTANT CAPABILITY TESTS
+
+# Test: Code analysis and bug detection
+step "Agent: analyze code for potential bugs"
+RBUG=$(curl -sS -X POST "$BASE/v1/run" \
+  -H 'content-type: application/json' \
+  -d '{"prompt":"Read calculator/main.py and analyze it for potential bugs, edge cases, or improvements. Provide specific recommendations.","workspace":"'"$WS"'"}' | jq -r .final_text)
+echo "$RBUG"
+
+# Test: Code refactoring suggestions
+step "Agent: suggest code refactoring"
+RREFACTOR=$(curl -sS -X POST "$BASE/v1/run" \
+  -H 'content-type: application/json' \
+  -d '{"prompt":"Analyze calculator/main.py and suggest refactoring improvements for better code structure, readability, and maintainability.","workspace":"'"$WS"'"}' | jq -r .final_text)
+echo "$RREFACTOR"
+
+# Test: Add unit tests
+step "Agent: create unit tests"
+RTEST_CREATE=$(curl -sS -X POST "$BASE/v1/run" \
+  -H 'content-type: application/json' \
+  -d '{"prompt":"Create a comprehensive unit test file called calculator/test_main.py that tests all functions in calculator/main.py including edge cases and error conditions.","workspace":"'"$WS"'"}' | jq -r .final_text)
+echo "$RTEST_CREATE"
+
+# Test: Run the unit tests
+step "Agent: run unit tests"
+RTEST_RUN=$(curl -sS -X POST "$BASE/v1/run" \
+  -H 'content-type: application/json' \
+  -d '{"prompt":"Run the unit tests in calculator/test_main.py using python3 -m pytest or python3 -m unittest","workspace":"'"$WS"'"}' | jq -r .final_text)
+echo "$RTEST_RUN"
+
+# Test: Code documentation generation
+step "Agent: add documentation"
+RDOC=$(curl -sS -X POST "$BASE/v1/run" \
+  -H 'content-type: application/json' \
+  -d '{"prompt":"Add comprehensive docstrings to all functions in calculator/main.py following Python PEP 257 conventions. Include parameter types, return types, and examples.","workspace":"'"$WS"'"}' | jq -r .final_text)
+echo "$RDOC"
+
+# Test: Performance optimization
+step "Agent: optimize performance"
+RPERF=$(curl -sS -X POST "$BASE/v1/run" \
+  -H 'content-type: application/json' \
+  -d '{"prompt":"Analyze calculator/main.py for performance bottlenecks and suggest optimizations. If possible, implement the optimizations.","workspace":"'"$WS"'"}' | jq -r .final_text)
+echo "$RPERF"
+
+# Test: Add logging and error handling
+step "Agent: enhance error handling and logging"
+RLOG=$(curl -sS -X POST "$BASE/v1/run" \
+  -H 'content-type: application/json' \
+  -d '{"prompt":"Add proper logging and enhanced error handling to calculator/main.py. Use Python logging module and handle various exception types gracefully.","workspace":"'"$WS"'"}' | jq -r .final_text)
+echo "$RLOG"
+
+# Test: Create configuration file
+step "Agent: create configuration system"
+RCONFIG=$(curl -sS -X POST "$BASE/v1/run" \
+  -H 'content-type: application/json' \
+  -d '{"prompt":"Create a configuration file calculator/config.py or calculator/config.json for the calculator application with settings like precision, logging level, etc. Update main.py to use this configuration.","workspace":"'"$WS"'"}' | jq -r .final_text)
+echo "$RCONFIG"
+
+# Test: Code style and formatting
+step "Agent: check code style"
+RSTYLE=$(curl -sS -X POST "$BASE/v1/run" \
+  -H 'content-type: application/json' \
+  -d '{"prompt":"Analyze calculator/main.py for PEP 8 compliance and code style issues. Suggest improvements for better Python coding standards.","workspace":"'"$WS"'"}' | jq -r .final_text)
+echo "$RSTYLE"
+
+# Test: Create requirements file
+step "Agent: generate requirements.txt"
+RREQ=$(curl -sS -X POST "$BASE/v1/run" \
+  -H 'content-type: application/json' \
+  -d '{"prompt":"Analyze all Python files in the calculator directory and create a requirements.txt file with all necessary dependencies and their versions.","workspace":"'"$WS"'"}' | jq -r .final_text)
+echo "$RREQ"
+
+# Test: Security analysis
+step "Agent: security analysis"
+RSEC=$(curl -sS -X POST "$BASE/v1/run" \
+  -H 'content-type: application/json' \
+  -d '{"prompt":"Perform a security analysis of calculator/main.py. Look for potential security vulnerabilities like input validation issues, code injection risks, etc.","workspace":"'"$WS"'"}' | jq -r .final_text)
+echo "$RSEC"
+
+# Test: Create API wrapper
+step "Agent: create API wrapper"
+RAPI=$(curl -sS -X POST "$BASE/v1/run" \
+  -H 'content-type: application/json' \
+  -d '{"prompt":"Create a REST API wrapper for the calculator using Flask or FastAPI. Create calculator/api.py that exposes the calculator functions as HTTP endpoints.","workspace":"'"$WS"'"}' | jq -r .final_text)
+echo "$RAPI"
+
 # 7) Clone a real Python repo and verify tree
 step "Clone psf/requests"
 BASE="https://agents-assistant-qwcl.onrender.com"
@@ -119,11 +205,27 @@ REXP=$(curl -sS -X POST "$BASE/v1/run" \
   -d '{"prompt":"Read src/requests/api.py and explain what get() does; include first ~15 lines of the function.","workspace":"'"$WS2"'"}' | jq -r .final_text)
 echo "$REXP" | head -c 1500; echo
 
-prompt="check is there a file called hello.txt in the workspace"
-REXP=$(curl -sS -X POST "$BASE/v1/run" \
+# Test: Code architecture analysis
+step "Agent: analyze project architecture"
+RARCH=$(curl -sS -X POST "$BASE/v1/run" \
   -H 'content-type: application/json' \
-  -d '{"prompt":"'"$prompt"'","workspace":"'"$WS2"'"}' | jq -r .final_text)
-echo "$REXP" | head -c 1500; echo
+  -d '{"prompt":"Analyze the overall architecture of the requests library. Explain the main modules, their responsibilities, and how they interact with each other.","workspace":"'"$WS2"'"}' | jq -r .final_text)
+echo "$RARCH" | head -c 2000; echo
+
+# Test: Find and explain design patterns
+step "Agent: identify design patterns"
+RPATTERN=$(curl -sS -X POST "$BASE/v1/run" \
+  -H 'content-type: application/json' \
+  -d '{"prompt":"Identify and explain any design patterns used in the requests library. Look at src/requests/ files and provide specific examples.","workspace":"'"$WS2"'"}' | jq -r .final_text)
+echo "$RPATTERN" | head -c 2000; echo
+
+# Test: Code complexity analysis
+step "Agent: analyze code complexity"
+RCOMPLEX=$(curl -sS -X POST "$BASE/v1/run" \
+  -H 'content-type: application/json' \
+  -d '{"prompt":"Analyze the complexity of key functions in src/requests/api.py. Identify functions that might benefit from refactoring due to high complexity.","workspace":"'"$WS2"'"}' | jq -r .final_text)
+echo "$RCOMPLEX" | head -c 1500; echo
+
 
 echo
 echo "All steps executed. Review any 'Note:' lines above for non-fatal observations."

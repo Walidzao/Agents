@@ -70,7 +70,12 @@ $("fileBtn").onclick = async () => {
   try {
     const r = await fetch(`${base()}/v1/workspaces/${ws}/file?path=${encodeURIComponent(path)}`);
     const j = await r.json();
-    $("fileOut").textContent = JSON.stringify(j, null, 2);
+    // Show raw content area when available, preserving indentation
+    if (j && typeof j.content === 'string') {
+      $("fileOut").textContent = j.content;
+    } else {
+      $("fileOut").textContent = JSON.stringify(j, null, 2);
+    }
   } catch (e) {
     $("fileOut").textContent = String(e);
   }
