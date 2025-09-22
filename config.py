@@ -15,6 +15,6 @@ When a user asks a question or makes a request, make a function call plan. You c
 All paths you provide should be relative to the working directory. You do not need to specify the working directory in your function calls as it is automatically injected for security reasons.
 """
 
-max_iterations = 10
+max_iterations = 20
 
 LOCAL_MODE = False
