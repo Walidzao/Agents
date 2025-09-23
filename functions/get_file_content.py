@@ -6,7 +6,7 @@ from google.genai import types
 def get_file_content(working_directory, file_path):
     abs_working_dir = os.path.realpath(working_directory)
     abs_file_path = os.path.realpath(os.path.join(abs_working_dir, file_path))
-    if not abs_file_path.startswith(abs_working_dir + os.sep):
+    if not abs_file_path.startswith(abs_working_dir):
         return f'Error: Cannot read "{file_path}" as it is outside the permitted working directory'
     if not os.path.isfile(abs_file_path):
         return f'Error: File not found or is not a regular file: "{file_path}"'

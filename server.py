@@ -143,9 +143,10 @@ def run(req: RunRequest):
 
     base_real = os.path.realpath(WORKSPACES_BASE)
     candidate = os.path.realpath(os.path.join(WORKSPACES_BASE, req.workspace))
-    if not candidate.startswith(base_real + os.sep):
+    if not candidate.startswith(base_real):
         raise HTTPException(400, "Invalid workspace path")
-    os.makedirs(candidate, exist_ok=True)
+    if not os.path.isdir(candidate):
+        raise HTTPException(404, "Workspace not found; upload or clone first")
     workspace_root = candidate
 
     load_dotenv()
