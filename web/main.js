@@ -73,15 +73,13 @@ async function refreshTree() {
 
 $("treeBtn").onclick = refreshTree;
 
-// Read file
-$("fileBtn").onclick = async () => {
+// Open file helper
+async function openFile(path) {
   const ws = $("ws").value.trim();
-  const path = $("filePath").value.trim();
-  if (!ws || !path) return ($("fileOut").textContent = "Set workspace_id and path");
+  if (!ws || !path) return;
   try {
     const r = await fetch(`${base()}/v1/workspaces/${ws}/file?path=${encodeURIComponent(path)}`);
     const j = await r.json();
-    // Show raw content area when available, preserving indentation
     if (j && typeof j.content === 'string') {
       renderCode(j.content);
       $("activePath").textContent = path;
@@ -89,9 +87,10 @@ $("fileBtn").onclick = async () => {
       $("fileOut").textContent = JSON.stringify(j, null, 2);
     }
   } catch (e) {
+    console.error(e);
     $("fileOut").textContent = String(e);
   }
-};
+}
 
 // Run prompt
 $("runBtn").onclick = async () => {
@@ -165,10 +164,7 @@ function renderNode(node, parentEl, prefix) {
     if (child.file) {
       li.className = "file";
       li.textContent = name;
-      li.onclick = () => {
-        $("filePath").value = `${prefix}${name}`;
-        $("fileBtn").click();
-      };
+      li.onclick = () => openFile(`${prefix}${name}`);
       parentEl.appendChild(li);
     } else {
       li.className = "dir";
