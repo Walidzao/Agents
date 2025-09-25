@@ -8,9 +8,12 @@ function base() {
 $("healthBtn").onclick = async () => {
   try {
     const r = await fetch(`${base()}/healthz`);
-    $("healthOut").textContent = `${r.status} ${await r.text()}`;
+    const text = await r.text();
+    $("healthBadge").textContent = r.ok ? "ok" : `err ${r.status}`;
+    $("healthBadge").style.color = r.ok ? "#8fff8f" : "#ff8f8f";
   } catch (e) {
-    $("healthOut").textContent = String(e);
+    $("healthBadge").textContent = "err";
+    $("healthBadge").style.color = "#ff8f8f";
   }
 };
 
@@ -24,7 +27,10 @@ $("uploadBtn").onclick = async () => {
     const r = await fetch(`${base()}/v1/workspaces/upload`, { method: "POST", body: fd });
     const j = await r.json();
     $("uploadOut").textContent = JSON.stringify(j, null, 2);
-    if (j.workspace_id) $("ws").value = j.workspace_id;
+    if (j.workspace_id) {
+      $("ws").value = j.workspace_id;
+      await refreshTree();
+    }
   } catch (e) {
     $("uploadOut").textContent = String(e);
   }
@@ -43,24 +49,29 @@ $("cloneBtn").onclick = async () => {
     });
     const j = await r.json();
     $("cloneOut").textContent = JSON.stringify(j, null, 2);
-    if (j.workspace_id) $("ws").value = j.workspace_id;
+    if (j.workspace_id) {
+      $("ws").value = j.workspace_id;
+      await refreshTree();
+    }
   } catch (e) {
     $("cloneOut").textContent = String(e);
   }
 };
 
 // Tree
-$("treeBtn").onclick = async () => {
+async function refreshTree() {
   const ws = $("ws").value.trim();
-  if (!ws) return ($("treeOut").textContent = "Set workspace_id first");
+  if (!ws) return;
   try {
     const r = await fetch(`${base()}/v1/workspaces/${ws}/tree`);
     const j = await r.json();
-    $("treeOut").textContent = JSON.stringify(j, null, 2);
+    renderTree(j.entries || []);
   } catch (e) {
-    $("treeOut").textContent = String(e);
+    $("tree").textContent = String(e);
   }
-};
+}
+
+$("treeBtn").onclick = refreshTree;
 
 // Read file
 $("fileBtn").onclick = async () => {
@@ -73,6 +84,7 @@ $("fileBtn").onclick = async () => {
     // Show raw content area when available, preserving indentation
     if (j && typeof j.content === 'string') {
       $("fileOut").textContent = j.content;
+      $("activePath").textContent = path;
     } else {
       $("fileOut").textContent = JSON.stringify(j, null, 2);
     }
@@ -86,6 +98,7 @@ $("runBtn").onclick = async () => {
   const ws = $("ws").value.trim();
   const prompt = $("prompt").value;
   if (!ws || !prompt) return ($("runOut").textContent = "Set workspace_id and prompt");
+  addChatBubble("user", prompt);
   try {
     const r = await fetch(`${base()}/v1/run`, {
       method: "POST",
@@ -94,9 +107,92 @@ $("runBtn").onclick = async () => {
     });
     const j = await r.json();
     $("runOut").textContent = JSON.stringify(j, null, 2);
+    // Refresh tree in case run wrote files
+    await refreshTree();
+    if (j && j.final_text) addChatBubble("assistant", j.final_text);
   } catch (e) {
     $("runOut").textContent = String(e);
   }
 };
+
+// send on Ctrl/Cmd+Enter
+$("prompt").addEventListener("keydown", (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key === "Enter") { $("runBtn").click(); }
+});
+
+// update tree when workspace id changes (blur)
+$("ws").addEventListener("change", refreshTree);
+$("ws").addEventListener("blur", refreshTree);
+
+// --- Tree rendering ---
+function renderTree(entries) {
+  // Build a nested structure from flat paths like a/b/c.txt
+  const root = {};
+  for (const p of entries) {
+    const parts = p.split("/");
+    let node = root;
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i];
+      const isFile = i === parts.length - 1 && !p.endsWith("/");
+      node.children = node.children || {};
+      node.children[part] = node.children[part] || { name: part, children: {} };
+      if (isFile) node.children[part].file = true;
+      node = node.children[part];
+    }
+  }
+  const treeEl = $("tree");
+  treeEl.innerHTML = "";
+  if (!entries.length) { treeEl.textContent = "No files"; return; }
+  const ul = document.createElement("ul");
+  ul.style.listStyle = "none";
+  ul.style.margin = 0; ul.style.paddingLeft = "6px";
+  treeEl.appendChild(ul);
+  renderNode(root, ul, "");
+}
+
+function renderNode(node, parentEl, prefix) {
+  if (!node.children) return;
+  const names = Object.keys(node.children).sort((a,b) => {
+    const A = node.children[a], B = node.children[b];
+    if (!!A.file === !!B.file) return a.localeCompare(b);
+    return A.file ? 1 : -1; // dirs first
+  });
+  for (const name of names) {
+    const child = node.children[name];
+    const li = document.createElement("li");
+    if (child.file) {
+      li.className = "file";
+      li.textContent = name;
+      li.onclick = () => {
+        $("filePath").value = `${prefix}${name}`;
+        $("fileBtn").click();
+      };
+      parentEl.appendChild(li);
+    } else {
+      li.className = "dir";
+      li.textContent = name;
+      const sub = document.createElement("ul");
+      sub.style.listStyle = "none"; sub.style.margin = 0; sub.style.paddingLeft = "14px";
+      let open = false;
+      const toggle = () => {
+        open = !open; sub.style.display = open ? "block" : "none";
+      };
+      li.onclick = toggle; toggle(); // start collapsed
+      parentEl.appendChild(li);
+      parentEl.appendChild(sub);
+      renderNode(child, sub, `${prefix}${name}/`);
+    }
+  }
+}
+
+function addChatBubble(role, text) {
+  const c = $("chatMessages");
+  const div = document.createElement("div");
+  div.style.margin = "6px 0";
+  div.style.whiteSpace = "pre-wrap";
+  div.textContent = (role === "user" ? "You: " : "Assistant: ") + text;
+  c.appendChild(div);
+  c.scrollTop = c.scrollHeight;
+}
 
 

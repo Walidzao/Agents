@@ -1,11 +1,23 @@
 * { box-sizing: border-box; }
 body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 0; background: #0b1020; color: #e6e8ef; }
-.container { max-width: 1100px; margin: 24px auto; padding: 0 16px; }
-h1 { margin: 0 0 16px; font-size: 24px; }
-.grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
-.card { background: #131a33; border: 1px solid #23305e; border-radius: 10px; padding: 12px; margin: 12px 0; }
-.card h2 { margin: 0 0 8px; font-size: 18px; }
-input, textarea { width: 100%; background: #0e1630; color: #e6e8ef; border: 1px solid #2a3a70; border-radius: 8px; padding: 8px; margin: 6px 0; }
+.root { height: 100vh; display: flex; flex-direction: column; }
+header { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: #0e1630; border-bottom: 1px solid #23305e; }
+header .right { display: flex; gap: 8px; align-items: center; }
+.layout { flex: 1; display: grid; grid-template-columns: 280px 1fr 380px; gap: 0; min-height: 0; }
+.explorer { border-right: 1px solid #23305e; display: flex; flex-direction: column; }
+.explorer-header { padding: 8px; border-bottom: 1px solid #23305e; }
+.explorer .row { display: flex; gap: 6px; margin-bottom: 6px; }
+.tree { flex: 1; overflow: auto; padding: 8px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
+.tree .dir { font-weight: 600; cursor: pointer; margin: 2px 0; }
+.tree .file { cursor: pointer; margin: 2px 0 2px 16px; opacity: 0.9; }
+.editor { display: flex; flex-direction: column; min-width: 0; }
+.tabs { padding: 8px; border-bottom: 1px solid #23305e; background: #0e1630; }
+.tab { font-size: 13px; color: #9fb3ff; }
+.code { flex: 1; }
+.chat { border-left: 1px solid #23305e; display: flex; flex-direction: column; }
+.chat-messages { flex: 1; overflow: auto; padding: 8px; }
+.chat-input { padding: 8px; display: flex; gap: 8px; border-top: 1px solid #23305e; }
+input, textarea { width: 100%; background: #0e1630; color: #e6e8ef; border: 1px solid #2a3a70; border-radius: 8px; padding: 8px; }
 button { background: #2f6bed; color: white; border: 0; border-radius: 8px; padding: 8px 12px; cursor: pointer; }
 button:hover { background: #2657c0; }
 /* Preserve code indentation exactly; scroll horizontally for long lines */

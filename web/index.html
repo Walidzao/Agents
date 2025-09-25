@@ -7,56 +7,56 @@
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <div class="container">
-    <h1>Agentic Code Assistant</h1>
-
-    <div class="card">
-      <h2>Backend</h2>
-      <input id="baseUrl" type="text" value="https://agents-assistant-qwcl.onrender.com" />
-      <button id="healthBtn">Check Health</button>
-      <pre id="healthOut"></pre>
-    </div>
-
-    <div class="grid">
-      <div class="card">
-        <h2>Upload Workspace (ZIP)</h2>
-        <input id="zipFile" type="file" accept=".zip" />
-        <button id="uploadBtn">Upload</button>
-        <pre id="uploadOut"></pre>
+  <div class="root">
+    <header>
+      <div class="left">
+        <strong>Agentic Code Assistant</strong>
       </div>
-
-      <div class="card">
-        <h2>Clone Workspace (Git)</h2>
-        <input id="repoUrl" type="text" placeholder="https://github.com/user/repo.git" />
-        <input id="branch" type="text" value="main" />
-        <button id="cloneBtn">Clone</button>
-        <pre id="cloneOut"></pre>
+      <div class="right">
+        <input id="baseUrl" type="text" value="https://agents-assistant-qwcl.onrender.com" />
+        <button id="healthBtn">Check</button>
+        <span id="healthBadge"></span>
       </div>
-    </div>
+    </header>
 
-    <div class="card">
-      <h2>Workspace</h2>
-      <label>workspace_id</label>
-      <input id="ws" type="text" placeholder="paste workspace_id here" />
-      <div class="grid">
-        <div>
-          <button id="treeBtn">List Tree</button>
-          <pre id="treeOut" class="scroll"></pre>
+    <main class="layout">
+      <aside class="explorer">
+        <div class="explorer-header">
+          <div class="row">
+            <input id="ws" type="text" placeholder="workspace_id" />
+          </div>
+          <div class="row">
+            <input id="repoUrl" type="text" placeholder="https://github.com/user/repo.git" />
+            <input id="branch" type="text" value="main" />
+          </div>
+          <div class="row">
+            <input id="zipFile" type="file" accept=".zip" />
+          </div>
+          <div class="row">
+            <button id="uploadBtn">Upload</button>
+            <button id="cloneBtn">Clone</button>
+            <button id="treeBtn">Refresh</button>
+          </div>
         </div>
-        <div>
-          <input id="filePath" type="text" placeholder="path e.g. calculator/README.md" />
-          <button id="fileBtn">Read File</button>
-          <pre id="fileOut" class="scroll"></pre>
-        </div>
-      </div>
-    </div>
+        <div id="tree" class="tree"></div>
+      </aside>
 
-    <div class="card">
-      <h2>Run (Prompt)</h2>
-      <textarea id="prompt" rows="5" placeholder="Type your prompt here..."></textarea>
-      <button id="runBtn">Send</button>
-      <pre id="runOut" class="scroll"></pre>
-    </div>
+      <section class="editor">
+        <div class="tabs">
+          <div id="activePath" class="tab">No file</div>
+        </div>
+        <pre id="fileOut" class="code scroll"></pre>
+      </section>
+
+      <section class="chat">
+        <div class="chat-messages" id="chatMessages"></div>
+        <div class="chat-input">
+          <textarea id="prompt" rows="3" placeholder="Ask the assistant... (will act on current workspace)"></textarea>
+          <button id="runBtn">Send</button>
+        </div>
+        <pre id="runOut" class="scroll"></pre>
+      </section>
+    </main>
   </div>
 
   <script src="main.js"></script>
