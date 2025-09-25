@@ -45,19 +45,24 @@
         <div class="tabs">
           <div id="activePath" class="tab">No file</div>
         </div>
-        <pre id="fileOut" class="code scroll"></pre>
+        <div id="viewer" class="viewer scroll">
+          <div id="gutter" class="gutter"></div>
+          <pre id="fileOut" class="code"></pre>
+        </div>
       </section>
 
       <section class="chat">
         <div class="chat-messages" id="chatMessages"></div>
         <div class="chat-input">
-          <textarea id="prompt" rows="3" placeholder="Ask the assistants... (will act on current workspace)"></textarea>
+          <textarea id="prompt" rows="3" placeholder="Ask the assistant…"></textarea>
           <button id="runBtn">Send</button>
         </div>
         <pre id="runOut" class="scroll"></pre>
       </section>
     </main>
   </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
   <script src="main.js"></script>
   </body>

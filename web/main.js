@@ -83,7 +83,7 @@ $("fileBtn").onclick = async () => {
     const j = await r.json();
     // Show raw content area when available, preserving indentation
     if (j && typeof j.content === 'string') {
-      $("fileOut").textContent = j.content;
+      renderCode(j.content);
       $("activePath").textContent = path;
     } else {
       $("fileOut").textContent = JSON.stringify(j, null, 2);
@@ -196,6 +196,23 @@ function addChatBubble(role, text) {
   div.textContent = (role === "user" ? "You: " : "Assistant: ") + text;
   c.appendChild(div);
   c.scrollTop = c.scrollHeight;
+}
+
+// --- Code viewer helpers ---
+function renderCode(text) {
+  const lines = text.split(/\r?\n/);
+  const gutter = $("gutter");
+  const out = $("fileOut");
+  gutter.innerHTML = "";
+  out.textContent = text; // preserve indentation
+  // line numbers
+  const frag = document.createDocumentFragment();
+  for (let i = 0; i < lines.length; i++) {
+    const d = document.createElement("div");
+    d.textContent = String(i + 1);
+    frag.appendChild(d);
+  }
+  gutter.appendChild(frag);
 }
 
 
