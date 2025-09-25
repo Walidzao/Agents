@@ -20,19 +20,19 @@ $("healthBtn").onclick = async () => {
 // Upload
 $("uploadBtn").onclick = async () => {
   const f = $("zipFile").files[0];
-  if (!f) return ($("uploadOut").textContent = "Choose a .zip first");
+  if (!f) return alert("Choose a .zip first");
   const fd = new FormData();
   fd.append("zip_file", f);
   try {
     const r = await fetch(`${base()}/v1/workspaces/upload`, { method: "POST", body: fd });
     const j = await r.json();
-    $("uploadOut").textContent = JSON.stringify(j, null, 2);
     if (j.workspace_id) {
       $("ws").value = j.workspace_id;
       await refreshTree();
     }
   } catch (e) {
-    $("uploadOut").textContent = String(e);
+    console.error(e);
+    alert("Upload failed: " + e);
   }
 };
 
@@ -48,13 +48,13 @@ $("cloneBtn").onclick = async () => {
       body: JSON.stringify({ repo_url: repo, branch }),
     });
     const j = await r.json();
-    $("cloneOut").textContent = JSON.stringify(j, null, 2);
     if (j.workspace_id) {
       $("ws").value = j.workspace_id;
       await refreshTree();
     }
   } catch (e) {
-    $("cloneOut").textContent = String(e);
+    console.error(e);
+    alert("Clone failed: " + e);
   }
 };
 
@@ -146,6 +146,8 @@ function renderTree(entries) {
   const ul = document.createElement("ul");
   ul.style.listStyle = "none";
   ul.style.margin = 0; ul.style.paddingLeft = "6px";
+  ul.style.maxHeight = "calc(100vh - 200px)";
+  ul.style.overflow = "auto";
   treeEl.appendChild(ul);
   renderNode(root, ul, "");
 }
@@ -170,12 +172,13 @@ function renderNode(node, parentEl, prefix) {
       parentEl.appendChild(li);
     } else {
       li.className = "dir";
-      li.textContent = name;
+      li.textContent = `▸ ${name}`;
       const sub = document.createElement("ul");
       sub.style.listStyle = "none"; sub.style.margin = 0; sub.style.paddingLeft = "14px";
       let open = false;
       const toggle = () => {
         open = !open; sub.style.display = open ? "block" : "none";
+        li.textContent = `${open ? "▾" : "▸"} ${name}`;
       };
       li.onclick = toggle; toggle(); // start collapsed
       parentEl.appendChild(li);
