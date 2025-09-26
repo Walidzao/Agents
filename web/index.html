@@ -45,9 +45,8 @@
         <div class="tabs">
           <div id="activePath" class="tab">No file</div>
         </div>
-        <div id="viewer" class="viewer scroll">
-          <div id="gutter" class="gutter"></div>
-          <pre id="fileOut" class="code"></pre>
+        <div id="viewer" class="viewer">
+          <div id="monaco" class="monaco"></div>
         </div>
       </section>
 
@@ -64,6 +63,8 @@
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
+  <script>window.require={paths:{vs:"https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs"}};</script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs/loader.min.js"></script>
   <script src="main.js"></script>
   </body>
   </html>

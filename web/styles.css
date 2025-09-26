@@ -14,9 +14,8 @@ header .right { display: flex; gap: 8px; align-items: center; }
 .tabs { padding: 8px; border-bottom: 1px solid #23305e; background: #0e1630; }
 .tab { font-size: 13px; color: #9fb3ff; }
 .code { flex: 1; }
-.viewer { display: flex; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
-.gutter { user-select: none; padding: 8px 12px 8px 8px; text-align: right; color: #7e8ac6; }
-.gutter div { height: 1.3em; }
+.viewer { flex: 1; display: flex; min-height: 0; }
+.monaco { width: 100%; height: calc(100vh - 140px); }
 .chat { border-left: 1px solid #23305e; display: flex; flex-direction: column; }
 .chat-messages { flex: 1; overflow: auto; padding: 8px; }
 .chat-input { padding: 8px; display: flex; gap: 8px; border-top: 1px solid #23305e; }

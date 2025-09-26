@@ -5,6 +5,25 @@ function base() {
 }
 
 // Health
+let editor;
+
+function initMonaco() {
+  if (editor) return;
+  require(["vs/editor/editor.main"], function () {
+    editor = monaco.editor.create(document.getElementById("monaco"), {
+      value: "",
+      language: "plaintext",
+      theme: "vs-dark",
+      readOnly: true,
+      automaticLayout: true,
+      minimap: { enabled: false },
+      fontSize: 13,
+    });
+  });
+}
+
+document.addEventListener("DOMContentLoaded", initMonaco);
+
 $("healthBtn").onclick = async () => {
   try {
     const r = await fetch(`${base()}/healthz`);
@@ -80,11 +99,11 @@ async function openFile(path) {
   try {
     const r = await fetch(`${base()}/v1/workspaces/${ws}/file?path=${encodeURIComponent(path)}`);
     const j = await r.json();
-    if (j && typeof j.content === 'string') {
-      renderCode(j.content);
+    if (j && typeof j.content === 'string' && editor) {
+      const lang = guessLanguage(path);
+      monaco.editor.setModelLanguage(editor.getModel(), lang);
+      editor.setValue(j.content);
       $("activePath").textContent = path;
-    } else {
-      $("fileOut").textContent = JSON.stringify(j, null, 2);
     }
   } catch (e) {
     console.error(e);
@@ -194,21 +213,10 @@ function addChatBubble(role, text) {
   c.scrollTop = c.scrollHeight;
 }
 
-// --- Code viewer helpers ---
-function renderCode(text) {
-  const lines = text.split(/\r?\n/);
-  const gutter = $("gutter");
-  const out = $("fileOut");
-  gutter.innerHTML = "";
-  out.textContent = text; // preserve indentation
-  // line numbers
-  const frag = document.createDocumentFragment();
-  for (let i = 0; i < lines.length; i++) {
-    const d = document.createElement("div");
-    d.textContent = String(i + 1);
-    frag.appendChild(d);
-  }
-  gutter.appendChild(frag);
+function guessLanguage(path) {
+  const ext = (path.split('.').pop() || '').toLowerCase();
+  const map = { js: 'javascript', ts: 'typescript', py: 'python', md: 'markdown', json: 'json', yml: 'yaml', yaml: 'yaml', html: 'html', css: 'css' };
+  return map[ext] || 'plaintext';
 }
 
 

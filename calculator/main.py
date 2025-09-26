@@ -19,8 +19,12 @@ def main():
             print(to_print)
         else:
             print("Error: Expression is empty or contains only whitespace.")
+    except ZeroDivisionError as e:
+        print(f"Error: {e}", file=sys.stderr)
+    except NameError as e:
+        print(f"Error: {e}", file=sys.stderr)
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"Error: {e}", file=sys.stderr)
 
 
 if __name__ == "__main__":
