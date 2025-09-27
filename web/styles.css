@@ -701,6 +701,34 @@ button:focus {
   margin: var(--space-sm) 0;
 }
 
+/* Directory diff styles */
+.directory-diff {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: var(--space-xl);
+}
+
+.directory-info {
+  text-align: center;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-primary);
+  border-radius: 8px;
+  padding: var(--space-xl);
+  max-width: 500px;
+}
+
+.directory-info h3 {
+  margin: 0 0 var(--space-md) 0;
+  color: var(--text-primary);
+  font-size: 18px;
+}
+
+.view-all-changes:hover {
+  background: var(--bg-active) !important;
+}
+
 .diff-line:before {
   content: attr(data-line-number);
   position: absolute;

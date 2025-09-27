@@ -292,6 +292,14 @@ def git_diff(ws_id: str, path: Optional[str] = None):
             if not abs_path.startswith(base_real + os.sep):
                 raise HTTPException(400, "Invalid path")
             
+            # Handle directory paths - directories cannot have individual diffs
+            if os.path.isdir(abs_path):
+                return {
+                    "diff": f"# Directory: {path}\n# Use git diff without path parameter to see all changes in this directory",
+                    "path": path,
+                    "is_directory": True
+                }
+            
             # Check if file is untracked
             status_result = subprocess.run(
                 ["git", "status", "--porcelain", path],

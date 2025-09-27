@@ -303,6 +303,15 @@ async function fetchDiff(path = null) {
     
     const response = await apiCall(url);
     const data = await response.json();
+    
+    // Handle directory responses
+    if (data.is_directory) {
+      return {
+        diff: data.diff,
+        isDirectory: true
+      };
+    }
+    
     return data.diff;
   } catch (error) {
     console.error('Diff error:', error);
@@ -373,6 +382,24 @@ function renderDiff(diffText) {
     const lineNum = line.lineNum || line.lineNumNew || '';
     return `<div class="${classes}" data-line-number="${lineNum}">${escapeHtml(line.content)}</div>`;
   }).join('');
+}
+
+function renderDirectoryDiff(diffText) {
+  const diffViewer = $('diffViewer');
+  diffViewer.innerHTML = `
+    <div class="directory-diff">
+      <div class="directory-info">
+        <h3>📁 Directory Diff</h3>
+        <p style="color: var(--text-secondary); margin: var(--space-md) 0;">
+          ${escapeHtml(diffText).replace(/\n/g, '<br>')}
+        </p>
+        <button onclick="setViewMode('diff'); openFile('')" class="view-all-changes" 
+                style="background: var(--button-primary); color: white; border: none; padding: var(--space-sm) var(--space-md); border-radius: 4px; cursor: pointer;">
+          View All Changes
+        </button>
+      </div>
+    </div>
+  `;
 }
 
 function escapeHtml(text) {
@@ -627,9 +654,15 @@ async function openFile(path) {
   try {
     if (state.viewMode === 'diff') {
       // Load diff view
-      const diff = await fetchDiff(path);
-      if (diff) {
-        renderDiff(diff);
+      const diffResult = await fetchDiff(path);
+      if (diffResult) {
+        if (typeof diffResult === 'object' && diffResult.isDirectory) {
+          // Handle directory diff
+          renderDirectoryDiff(diffResult.diff);
+        } else {
+          // Handle file diff
+          renderDiff(diffResult);
+        }
         showDiffView();
       } else {
         showToast('No changes in this file', 'info');
