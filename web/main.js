@@ -133,38 +133,69 @@ function updateFileStatusMarkers(fileStatuses) {
     el.classList.remove('modified', 'added', 'deleted', 'untracked');
   });
   
-  if (!fileStatuses) return;
+  if (!fileStatuses || Object.keys(fileStatuses).length === 0) {
+    // Hide changes tab if no changes
+    $('changesTab').classList.add('hidden');
+    return;
+  }
   
-  // Add status markers
+  // Show changes tab if there are changes
+  $('changesTab').classList.remove('hidden');
+  
+  console.log('Updating file status markers for:', fileStatuses);
+  
+  // Add status markers to files
   Object.entries(fileStatuses).forEach(([path, status]) => {
+    // Find the file element by data-path attribute
     const fileEl = document.querySelector(`[data-path="${path}"]`);
+    console.log(`Looking for file with path "${path}":`, fileEl);
+    
     if (fileEl) {
+      // Add status class
       fileEl.classList.add(status);
-      const marker = document.createElement('span');
-      marker.className = 'file-status';
-      marker.textContent = getStatusMarker(status);
-      fileEl.insertBefore(marker, fileEl.firstChild);
+      
+      // Add status marker
+      const existingMarker = fileEl.querySelector('.file-status');
+      if (!existingMarker) {
+        const marker = document.createElement('span');
+        marker.className = 'file-status';
+        marker.textContent = getStatusMarker(status);
+        marker.title = `${status.charAt(0).toUpperCase() + status.slice(1)}: ${path}`;
+        fileEl.insertBefore(marker, fileEl.firstChild);
+        console.log(`Added ${status} marker to ${path}`);
+      }
+    } else {
+      console.warn(`Could not find file element for path: ${path}`);
     }
     
-    // Also mark parent directories
+    // Mark parent directories as having changes
     const parts = path.split('/');
     for (let i = parts.length - 1; i > 0; i--) {
-      const dirPath = parts.slice(0, i).join('/');
-      const dirEls = Array.from($$('.dir')).filter(el => 
-        el.textContent.includes(parts[i-1]) && 
-        el.parentElement.querySelector(`[data-path^="${dirPath}/"]`)
-      );
+      const dirName = parts[i - 1];
+      // Find directory elements that match this part of the path
+      const dirEls = Array.from($$('.dir')).filter(el => {
+        const span = el.querySelector('span');
+        return span && span.textContent.includes(dirName);
+      });
+      
       dirEls.forEach(dirEl => {
-        if (!dirEl.classList.contains('modified')) {
-          dirEl.classList.add('modified');
-          const marker = document.createElement('span');
-          marker.className = 'dir-status';
-          marker.textContent = 'M';
-          dirEl.insertBefore(marker, dirEl.firstChild);
+        if (!dirEl.classList.contains('has-changes')) {
+          dirEl.classList.add('has-changes');
+          const existingMarker = dirEl.querySelector('.dir-status');
+          if (!existingMarker) {
+            const marker = document.createElement('span');
+            marker.className = 'dir-status';
+            marker.textContent = '•';
+            marker.title = 'Contains modified files';
+            dirEl.insertBefore(marker, dirEl.firstChild);
+          }
         }
       });
     }
   });
+  
+  // Render changes tree
+  renderChangesTree(fileStatuses);
 }
 
 function getStatusMarker(status) {
@@ -176,6 +207,74 @@ function getStatusMarker(status) {
     case 'renamed': return 'R';
     default: return '?';
   }
+}
+
+function renderChangesTree(fileStatuses) {
+  const changesTreeEl = $('changesTree');
+  changesTreeEl.innerHTML = '';
+  
+  if (!fileStatuses || Object.keys(fileStatuses).length === 0) {
+    changesTreeEl.innerHTML = '<div style="padding: 8px; color: var(--text-tertiary);">No changes</div>';
+    return;
+  }
+  
+  const ul = document.createElement('ul');
+  ul.setAttribute('role', 'group');
+  ul.style.listStyle = 'none';
+  ul.style.margin = '0';
+  ul.style.padding = '0';
+  
+  Object.entries(fileStatuses).forEach(([path, status]) => {
+    const li = document.createElement('li');
+    li.className = `file ${status}`;
+    li.dataset.path = path;
+    li.tabIndex = 0;
+    li.setAttribute('role', 'treeitem');
+    
+    // Create status marker
+    const marker = document.createElement('span');
+    marker.className = 'file-status';
+    marker.textContent = getStatusMarker(status);
+    marker.title = `${status.charAt(0).toUpperCase() + status.slice(1)}`;
+    
+    // Create filename
+    const filename = path.split('/').pop();
+    const textNode = document.createTextNode(` ${filename}`);
+    
+    // Create path info
+    const pathInfo = document.createElement('div');
+    pathInfo.style.fontSize = '11px';
+    pathInfo.style.color = 'var(--text-tertiary)';
+    pathInfo.style.marginLeft = '20px';
+    pathInfo.textContent = path;
+    
+    li.appendChild(marker);
+    li.appendChild(textNode);
+    li.appendChild(pathInfo);
+    
+    // Add click handler
+    li.addEventListener('click', () => openFile(path));
+    li.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        openFile(path);
+      }
+    });
+    
+    ul.appendChild(li);
+  });
+  
+  changesTreeEl.appendChild(ul);
+}
+
+function switchTreeTab(tabName) {
+  // Update tab buttons
+  $('filesTab').classList.toggle('active', tabName === 'files');
+  $('changesTab').classList.toggle('active', tabName === 'changes');
+  
+  // Update tree visibility
+  $('tree').classList.toggle('hidden', tabName !== 'files');
+  $('changesTree').classList.toggle('hidden', tabName !== 'changes');
 }
 
 async function fetchDiff(path = null) {
@@ -971,6 +1070,10 @@ document.addEventListener("DOMContentLoaded", () => {
   $("uploadBtn").addEventListener('click', uploadWorkspace);
   $("cloneBtn").addEventListener('click', cloneRepository);
   $("treeBtn").addEventListener('click', refreshTree);
+  
+  // Tree tab switching
+  $("filesTab").addEventListener('click', () => switchTreeTab('files'));
+  $("changesTab").addEventListener('click', () => switchTreeTab('changes'));
   
   // Download buttons
   $("downloadZipBtn").addEventListener('click', () => downloadWorkspace('zip'));

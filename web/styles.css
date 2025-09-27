@@ -145,6 +145,35 @@ header .right {
   font-size: 12px;
 }
 
+/* Tree tabs */
+.tree-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border-primary);
+  background: var(--bg-secondary);
+}
+
+.tree-tab {
+  flex: 1;
+  padding: var(--space-sm);
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.tree-tab:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.tree-tab.active {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  border-bottom: 2px solid var(--text-accent);
+}
+
 .tree {
   flex: 1;
   overflow: auto;
@@ -233,6 +262,26 @@ header .right {
 .tree .file.untracked .file-status,
 .tree .dir.untracked .dir-status {
   color: var(--text-tertiary);
+}
+
+.tree .dir.has-changes .dir-status {
+  color: var(--text-accent);
+}
+
+/* Changes tree specific styles */
+#changesTree .file {
+  padding: var(--space-xs) var(--space-sm);
+  margin: 2px 0;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+#changesTree .file:hover {
+  background: var(--bg-hover);
+}
+
+#changesTree .file.selected {
+  background: var(--bg-active);
 }
 
 .tree .file.selected,
