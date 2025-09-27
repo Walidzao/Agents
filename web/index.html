@@ -38,6 +38,23 @@
             <button id="cloneBtn">Clone</button>
             <button id="treeBtn" aria-label="Refresh file tree">Refresh</button>
           </div>
+          <div class="download-buttons">
+            <button id="downloadZipBtn" title="Download workspace as ZIP">
+              <span>⬇</span> ZIP
+            </button>
+            <button id="downloadDiffBtn" title="Download changes as diff" class="hidden">
+              <span>⬇</span> Diff
+            </button>
+          </div>
+        </div>
+        <div id="gitToolbar" class="git-toolbar hidden">
+          <div class="status">
+            <span>Branch:</span>
+            <span class="branch" id="gitBranch">main</span>
+          </div>
+          <div class="actions">
+            <button id="commitBtn">Commit & Push</button>
+          </div>
         </div>
         <div id="treeLoading" class="tree-loading hidden">
           <div class="skeleton" style="height: 20px; margin: 8px;"></div>
@@ -51,6 +68,12 @@
       <section class="editor" role="main">
         <div class="breadcrumbs" id="breadcrumbs" aria-label="File path">
           <span>No file selected</span>
+        </div>
+        <div class="editor-toolbar hidden" id="editorToolbar">
+          <div class="toggle">
+            <button id="viewCodeBtn" class="active">Code</button>
+            <button id="viewDiffBtn">Diff</button>
+          </div>
         </div>
         <div class="tabs">
           <div id="activePath" class="tab">No file</div>
@@ -68,6 +91,7 @@
             <div id="gutter" class="gutter"></div>
             <pre id="fileOut" class="code"></pre>
           </div>
+          <div id="diffViewer" class="diff-viewer hidden"></div>
         </div>
       </section>
 
@@ -89,6 +113,25 @@
 
   <!-- Toast notifications -->
   <div id="toast" class="toast" role="alert" aria-live="assertive"></div>
+
+  <!-- Commit Modal -->
+  <div id="commitModal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-content">
+      <h3>Commit & Push Changes</h3>
+      <div class="form-group">
+        <label for="commitMessage">Commit message:</label>
+        <textarea id="commitMessage" placeholder="Describe your changes..." rows="3"></textarea>
+      </div>
+      <div class="form-group">
+        <label for="targetBranch">Branch (optional):</label>
+        <input id="targetBranch" type="text" placeholder="Leave empty to use current branch" />
+      </div>
+      <div class="modal-actions">
+        <button id="cancelCommitBtn">Cancel</button>
+        <button id="confirmCommitBtn" class="primary">Commit & Push</button>
+      </div>
+    </div>
+  </div>
 
   <!-- Monaco Editor -->
   <script>window.require = { paths: { vs: "https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs" } };</script>

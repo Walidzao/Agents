@@ -11,7 +11,10 @@ const state = {
   chatHistory: [],
   isStreaming: false,
   monacoLoaded: false,
-  editor: null
+  editor: null,
+  gitStatus: null,
+  viewMode: 'code', // 'code' or 'diff'
+  currentDiff: null
 };
 
 // Configuration
@@ -77,6 +80,256 @@ function debounce(func, delay) {
     clearTimeout(timeoutId);
     timeoutId = setTimeout(() => func.apply(this, args), delay);
   };
+}
+
+// Git operations
+async function fetchGitStatus() {
+  if (!state.workspace) return;
+  
+  try {
+    const response = await apiCall(`/v1/workspaces/${state.workspace}/git/status`);
+    const data = await response.json();
+    state.gitStatus = data;
+    
+    if (data.is_git) {
+      $('gitToolbar').classList.remove('hidden');
+      $('gitBranch').textContent = data.branch || 'main';
+      $('downloadDiffBtn').classList.remove('hidden');
+      
+      // Update file status markers in tree
+      updateFileStatusMarkers(data.files);
+    } else {
+      $('gitToolbar').classList.add('hidden');
+      $('downloadDiffBtn').classList.add('hidden');
+    }
+    
+    return data;
+  } catch (error) {
+    console.error('Git status error:', error);
+    return null;
+  }
+}
+
+function updateFileStatusMarkers(fileStatuses) {
+  // Clear existing markers
+  $$('.file-status, .dir-status').forEach(el => el.remove());
+  $$('.file, .dir').forEach(el => {
+    el.classList.remove('modified', 'added', 'deleted', 'untracked');
+  });
+  
+  if (!fileStatuses) return;
+  
+  // Add status markers
+  Object.entries(fileStatuses).forEach(([path, status]) => {
+    const fileEl = document.querySelector(`[data-path="${path}"]`);
+    if (fileEl) {
+      fileEl.classList.add(status);
+      const marker = document.createElement('span');
+      marker.className = 'file-status';
+      marker.textContent = getStatusMarker(status);
+      fileEl.insertBefore(marker, fileEl.firstChild);
+    }
+    
+    // Also mark parent directories
+    const parts = path.split('/');
+    for (let i = parts.length - 1; i > 0; i--) {
+      const dirPath = parts.slice(0, i).join('/');
+      const dirEls = $$('.dir').filter(el => 
+        el.textContent.includes(parts[i-1]) && 
+        el.parentElement.querySelector(`[data-path^="${dirPath}/"]`)
+      );
+      dirEls.forEach(dirEl => {
+        if (!dirEl.classList.contains('modified')) {
+          dirEl.classList.add('modified');
+          const marker = document.createElement('span');
+          marker.className = 'dir-status';
+          marker.textContent = 'M';
+          dirEl.insertBefore(marker, dirEl.firstChild);
+        }
+      });
+    }
+  });
+}
+
+function getStatusMarker(status) {
+  switch (status) {
+    case 'modified': return 'M';
+    case 'added': return 'A';
+    case 'deleted': return 'D';
+    case 'untracked': return 'U';
+    case 'renamed': return 'R';
+    default: return '?';
+  }
+}
+
+async function fetchDiff(path = null) {
+  if (!state.workspace) return null;
+  
+  try {
+    const url = path 
+      ? `/v1/workspaces/${state.workspace}/git/diff?path=${encodeURIComponent(path)}`
+      : `/v1/workspaces/${state.workspace}/git/diff`;
+    
+    const response = await apiCall(url);
+    const data = await response.json();
+    return data.diff;
+  } catch (error) {
+    console.error('Diff error:', error);
+    return null;
+  }
+}
+
+function parseDiff(diffText) {
+  const lines = diffText.split('\n');
+  const parsed = [];
+  let currentFile = null;
+  let lineNumOld = 0;
+  let lineNumNew = 0;
+  
+  lines.forEach(line => {
+    if (line.startsWith('diff --git')) {
+      // File header
+      const match = line.match(/b\/(.+)$/);
+      if (match) {
+        currentFile = match[1];
+        parsed.push({ type: 'header', content: line, file: currentFile });
+      }
+    } else if (line.startsWith('+++') || line.startsWith('---')) {
+      parsed.push({ type: 'header', content: line });
+    } else if (line.startsWith('@@')) {
+      // Hunk header
+      const match = line.match(/@@ -(\d+),?\d* \+(\d+),?\d* @@/);
+      if (match) {
+        lineNumOld = parseInt(match[1]);
+        lineNumNew = parseInt(match[2]);
+      }
+      parsed.push({ type: 'header', content: line });
+    } else if (line.startsWith('+')) {
+      parsed.push({ 
+        type: 'add', 
+        content: line.substring(1), 
+        lineNum: lineNumNew++,
+        prefix: '+'
+      });
+    } else if (line.startsWith('-')) {
+      parsed.push({ 
+        type: 'remove', 
+        content: line.substring(1), 
+        lineNum: lineNumOld++,
+        prefix: '-'
+      });
+    } else {
+      // Context line
+      parsed.push({ 
+        type: 'context', 
+        content: line.substring(1) || line, 
+        lineNumOld: lineNumOld++,
+        lineNumNew: lineNumNew++,
+        prefix: ' '
+      });
+    }
+  });
+  
+  return parsed;
+}
+
+function renderDiff(diffText) {
+  const diffViewer = $('diffViewer');
+  const parsedDiff = parseDiff(diffText);
+  
+  diffViewer.innerHTML = parsedDiff.map(line => {
+    const classes = ['diff-line', line.type].join(' ');
+    const lineNum = line.lineNum || line.lineNumNew || '';
+    return `<div class="${classes}" data-line-number="${lineNum}">${escapeHtml(line.content)}</div>`;
+  }).join('');
+}
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+// Download operations
+async function downloadWorkspace(format = 'zip') {
+  if (!state.workspace) {
+    showToast('No workspace selected', 'warning');
+    return;
+  }
+  
+  try {
+    const response = await fetch(`${base()}/v1/workspaces/${state.workspace}/download?format=${format}`, {
+      method: 'POST'
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Download failed: ${response.statusText}`);
+    }
+    
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `workspace_${state.workspace}.${format}`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    showToast(`Downloaded workspace as ${format}`, 'success');
+  } catch (error) {
+    showToast(`Download failed: ${error.message}`, 'error');
+  }
+}
+
+// Commit & Push
+function showCommitModal() {
+  const modal = $('commitModal');
+  modal.classList.remove('hidden');
+  $('commitMessage').focus();
+}
+
+function hideCommitModal() {
+  const modal = $('commitModal');
+  modal.classList.add('hidden');
+  $('commitMessage').value = '';
+  $('targetBranch').value = '';
+}
+
+async function commitAndPush() {
+  const message = $('commitMessage').value.trim();
+  const branch = $('targetBranch').value.trim();
+  
+  if (!message) {
+    showToast('Please enter a commit message', 'warning');
+    return;
+  }
+  
+  try {
+    const response = await apiCall(`/v1/workspaces/${state.workspace}/git/push`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message, branch })
+    });
+    
+    const data = await response.json();
+    
+    hideCommitModal();
+    
+    if (data.status === 'no_changes') {
+      showToast('No changes to commit', 'info');
+    } else if (data.status === 'pushed' || data.status === 'pushed_to_branch') {
+      showToast(`Successfully pushed to ${data.branch}`, 'success');
+      if (data.pr_url) {
+        showToast(`PR created: ${data.pr_url}`, 'success');
+      }
+      // Refresh git status
+      await fetchGitStatus();
+      await refreshTree();
+    }
+  } catch (error) {
+    showToast(`Push failed: ${error.message}`, 'error');
+  }
 }
 
 // Monaco Editor initialization
@@ -182,14 +435,30 @@ async function openFile(path) {
   updateBreadcrumbs(path);
   showViewerLoading(true);
   
+  // Show editor toolbar for files
+  $('editorToolbar').classList.remove('hidden');
+  
   try {
-    const response = await apiCall(`/v1/workspaces/${state.workspace}/file?path=${encodeURIComponent(path)}`);
-    const data = await response.json();
-    
-    if (data && typeof data.content === 'string') {
-      renderCode(data.content, path);
-      $("activePath").textContent = path.split('/').pop() || path;
-      selectTreeItem(path);
+    if (state.viewMode === 'diff') {
+      // Load diff view
+      const diff = await fetchDiff(path);
+      if (diff) {
+        renderDiff(diff);
+        showDiffView();
+      } else {
+        showToast('No changes in this file', 'info');
+        setViewMode('code');
+      }
+    } else {
+      // Load code view
+      const response = await apiCall(`/v1/workspaces/${state.workspace}/file?path=${encodeURIComponent(path)}`);
+      const data = await response.json();
+      
+      if (data && typeof data.content === 'string') {
+        renderCode(data.content, path);
+        $("activePath").textContent = path.split('/').pop() || path;
+        selectTreeItem(path);
+      }
     }
   } catch (error) {
     console.error('File open error:', error);
@@ -204,6 +473,7 @@ function renderCode(content, path) {
     const language = guessLanguage(path);
     const model = monaco.editor.createModel(content, language);
     state.editor.setModel(model);
+    showCodeView();
   } else {
     // Fallback rendering
     const lines = content.split('\n');
@@ -213,12 +483,47 @@ function renderCode(content, path) {
     // Generate line numbers
     gutter.innerHTML = lines.map((_, i) => `<div>${i + 1}</div>`).join('');
     code.textContent = content;
+    showCodeView();
     
     // Lazy load Monaco on first file open
     if (!state.monacoLoaded) {
       initMonaco();
     }
   }
+}
+
+function setViewMode(mode) {
+  state.viewMode = mode;
+  
+  if (mode === 'code') {
+    $('viewCodeBtn').classList.add('active');
+    $('viewDiffBtn').classList.remove('active');
+  } else {
+    $('viewCodeBtn').classList.remove('active');
+    $('viewDiffBtn').classList.add('active');
+  }
+  
+  // Reload current file in new mode
+  if (state.currentFile) {
+    openFile(state.currentFile);
+  }
+}
+
+function showCodeView() {
+  if (state.monacoLoaded) {
+    $('monaco').hidden = false;
+    $('fallback').style.display = 'none';
+  } else {
+    $('monaco').hidden = true;
+    $('fallback').style.display = 'flex';
+  }
+  $('diffViewer').classList.add('hidden');
+}
+
+function showDiffView() {
+  $('monaco').hidden = true;
+  $('fallback').style.display = 'none';
+  $('diffViewer').classList.remove('hidden');
 }
 
 function showViewerLoading(show) {
@@ -279,6 +584,9 @@ async function refreshTree() {
     const data = await response.json();
     state.treeData = data.entries || [];
     renderTree(state.treeData);
+    
+    // Fetch git status after tree refresh
+    await fetchGitStatus();
   } catch (error) {
     $("tree").innerHTML = `<div class="error">Error loading tree: ${error.message}</div>`;
   } finally {
@@ -528,7 +836,7 @@ async function sendPrompt() {
       $("runOut").classList.remove('hidden');
     }
     
-    // Refresh tree after operations
+    // Refresh tree and git status after operations
     await debouncedRefreshTree();
     
   } catch (error) {
@@ -642,6 +950,19 @@ document.addEventListener("DOMContentLoaded", () => {
   $("cloneBtn").addEventListener('click', cloneRepository);
   $("treeBtn").addEventListener('click', refreshTree);
   
+  // Download buttons
+  $("downloadZipBtn").addEventListener('click', () => downloadWorkspace('zip'));
+  $("downloadDiffBtn").addEventListener('click', () => downloadWorkspace('diff'));
+  
+  // Git operations
+  $("commitBtn").addEventListener('click', showCommitModal);
+  $("cancelCommitBtn").addEventListener('click', hideCommitModal);
+  $("confirmCommitBtn").addEventListener('click', commitAndPush);
+  
+  // View mode toggle
+  $("viewCodeBtn").addEventListener('click', () => setViewMode('code'));
+  $("viewDiffBtn").addEventListener('click', () => setViewMode('diff'));
+  
   // Workspace input
   $("ws").addEventListener('change', (e) => {
     state.workspace = e.target.value.trim();
@@ -673,6 +994,13 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   
   $("prompt").addEventListener('input', autoResizeTextarea);
+  
+  // Modal close on escape
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !$('commitModal').classList.contains('hidden')) {
+      hideCommitModal();
+    }
+  });
   
   // Global keyboard shortcuts
   document.addEventListener('keydown', (e) => {

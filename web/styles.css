@@ -199,6 +199,40 @@ header .right {
 .tree .file {
   color: var(--text-secondary);
   padding-left: 20px;
+  position: relative;
+}
+
+/* Git status markers */
+.tree .file-status,
+.tree .dir-status {
+  position: absolute;
+  left: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 11px;
+  font-weight: 600;
+  width: 14px;
+  text-align: center;
+}
+
+.tree .file.modified .file-status,
+.tree .dir.modified .dir-status {
+  color: var(--warning);
+}
+
+.tree .file.added .file-status,
+.tree .dir.added .dir-status {
+  color: var(--success);
+}
+
+.tree .file.deleted .file-status,
+.tree .dir.deleted .dir-status {
+  color: var(--error);
+}
+
+.tree .file.untracked .file-status,
+.tree .dir.untracked .dir-status {
+  color: var(--text-tertiary);
 }
 
 .tree .file.selected,
@@ -579,4 +613,182 @@ button:focus {
 
 .warning {
   color: var(--warning);
+}
+
+/* Diff viewer */
+.diff-viewer {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.5;
+  overflow: auto;
+  background: var(--bg-primary);
+  padding: var(--space-md);
+}
+
+.diff-line {
+  white-space: pre;
+  padding: 0 var(--space-sm);
+  margin: 0;
+  position: relative;
+}
+
+.diff-line.add {
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--success);
+}
+
+.diff-line.remove {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--error);
+}
+
+.diff-line.context {
+  color: var(--text-secondary);
+}
+
+.diff-line.header {
+  color: var(--text-accent);
+  font-weight: 600;
+  margin: var(--space-sm) 0;
+}
+
+.diff-line:before {
+  content: attr(data-line-number);
+  position: absolute;
+  left: -40px;
+  width: 30px;
+  text-align: right;
+  color: var(--text-tertiary);
+  font-size: 11px;
+}
+
+/* Git actions toolbar */
+.git-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-primary);
+  font-size: 12px;
+}
+
+.git-toolbar .status {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  color: var(--text-secondary);
+}
+
+.git-toolbar .branch {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.git-toolbar .actions {
+  margin-left: auto;
+  display: flex;
+  gap: var(--space-xs);
+}
+
+.git-toolbar button {
+  font-size: 12px;
+  padding: 4px 12px;
+}
+
+/* Download buttons */
+.download-buttons {
+  display: flex;
+  gap: var(--space-sm);
+  margin-top: var(--space-sm);
+}
+
+.download-buttons button {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+}
+
+/* Diff toggle in editor */
+.editor-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-xs) var(--space-md);
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border-primary);
+}
+
+.editor-toolbar .toggle {
+  display: flex;
+  background: var(--bg-secondary);
+  border-radius: 4px;
+  padding: 2px;
+}
+
+.editor-toolbar .toggle button {
+  padding: 4px 8px;
+  background: transparent;
+  border: none;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.editor-toolbar .toggle button.active {
+  background: var(--bg-active);
+  color: var(--text-primary);
+  border-radius: 3px;
+}
+
+/* Modal */
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: 8px;
+  padding: var(--space-xl);
+  max-width: 500px;
+  width: 90%;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+
+.modal-content h3 {
+  margin: 0 0 var(--space-lg) 0;
+  color: var(--text-primary);
+}
+
+.form-group {
+  margin-bottom: var(--space-lg);
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: var(--space-xs);
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.modal-actions {
+  display: flex;
+  gap: var(--space-sm);
+  justify-content: flex-end;
+  margin-top: var(--space-xl);
+}
+
+.modal-actions button.primary {
+  background: var(--button-primary);
 }
