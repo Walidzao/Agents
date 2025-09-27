@@ -226,10 +226,11 @@ def git_status(ws_id: str):
         for line in result.stdout.strip().split('\n'):
             if not line:
                 continue
-            # Format: XY filename
+            # Format: XY filename (note: there might be multiple spaces)
             # X = index status, Y = working tree status
             status_code = line[:2]
-            filename = line[3:].strip()  # Remove any trailing whitespace
+            # Skip the status code and any whitespace to get the filename
+            filename = line[2:].lstrip()  # Remove status code and leading whitespace
             
             # Map git status codes to simple status
             if status_code == "??":
