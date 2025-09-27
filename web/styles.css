@@ -669,16 +669,39 @@ button:focus {
   font-family: var(--font-mono);
   font-size: 13px;
   line-height: 1.5;
-  overflow: auto;
+  overflow-y: auto;
+  overflow-x: auto;
   background: var(--bg-primary);
   padding: var(--space-md);
+  height: 100%;
+  max-height: 100%;
 }
 
 .diff-line {
-  white-space: pre;
-  padding: 0 var(--space-sm);
+  white-space: pre-wrap;
+  padding: 2px var(--space-sm);
   margin: 0;
   position: relative;
+  display: flex;
+  align-items: flex-start;
+}
+
+.diff-line .line-number {
+  display: inline-block;
+  width: 50px;
+  color: var(--text-tertiary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-align: right;
+  margin-right: var(--space-sm);
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.diff-line .line-content {
+  flex: 1;
+  white-space: pre-wrap;
+  word-break: break-all;
 }
 
 .diff-line.add {
@@ -699,6 +722,26 @@ button:focus {
   color: var(--text-accent);
   font-weight: 600;
   margin: var(--space-sm) 0;
+}
+
+.diff-line.file-header {
+  color: var(--text-accent);
+  font-weight: 600;
+  margin: var(--space-md) 0 var(--space-sm) 0;
+  padding: var(--space-sm);
+  background: var(--bg-tertiary);
+  border-radius: 4px;
+  border-left: 3px solid var(--text-accent);
+  display: block; /* Override flex */
+}
+
+.diff-line.separator {
+  color: var(--text-tertiary);
+  text-align: center;
+  margin: var(--space-sm) 0;
+  font-size: 16px;
+  opacity: 0.7;
+  display: block; /* Override flex */
 }
 
 /* Directory diff styles */

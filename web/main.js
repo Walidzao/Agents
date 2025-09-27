@@ -328,46 +328,58 @@ function parseDiff(diffText) {
   
   lines.forEach(line => {
     if (line.startsWith('diff --git')) {
-      // File header
+      // File header - show clean filename
       const match = line.match(/b\/(.+)$/);
       if (match) {
         currentFile = match[1];
-        parsed.push({ type: 'header', content: line, file: currentFile });
+        parsed.push({ 
+          type: 'file-header', 
+          content: `📄 ${currentFile}`, 
+          file: currentFile 
+        });
       }
-    } else if (line.startsWith('+++') || line.startsWith('---')) {
-      parsed.push({ type: 'header', content: line });
     } else if (line.startsWith('@@')) {
-      // Hunk header
+      // Hunk header - extract line numbers but show cleaner separator
       const match = line.match(/@@ -(\d+),?\d* \+(\d+),?\d* @@/);
       if (match) {
         lineNumOld = parseInt(match[1]);
         lineNumNew = parseInt(match[2]);
       }
-      parsed.push({ type: 'header', content: line });
-    } else if (line.startsWith('+')) {
+      // Add visual separator instead of cryptic @@ line
+      if (parsed.length > 1) { // Only add separator if not the first hunk
+        parsed.push({ 
+          type: 'separator', 
+          content: '⋯', 
+          lineNum: null 
+        });
+      }
+    } else if (line.startsWith('+') && !line.startsWith('+++')) {
+      // Added line - clean display
       parsed.push({ 
         type: 'add', 
         content: line.substring(1), 
         lineNum: lineNumNew++,
         prefix: '+'
       });
-    } else if (line.startsWith('-')) {
+    } else if (line.startsWith('-') && !line.startsWith('---')) {
+      // Removed line - clean display
       parsed.push({ 
         type: 'remove', 
         content: line.substring(1), 
         lineNum: lineNumOld++,
         prefix: '-'
       });
-    } else {
-      // Context line
+    } else if (line.startsWith(' ')) {
+      // Context line - only show for actual changes
       parsed.push({ 
         type: 'context', 
-        content: line.substring(1) || line, 
+        content: line.substring(1), 
         lineNumOld: lineNumOld++,
         lineNumNew: lineNumNew++,
         prefix: ' '
       });
     }
+    // Skip other headers like '+++', '---', 'index', 'new file mode', etc.
   });
   
   return parsed;
@@ -380,7 +392,20 @@ function renderDiff(diffText) {
   diffViewer.innerHTML = parsedDiff.map(line => {
     const classes = ['diff-line', line.type].join(' ');
     const lineNum = line.lineNum || line.lineNumNew || '';
-    return `<div class="${classes}" data-line-number="${lineNum}">${escapeHtml(line.content)}</div>`;
+    
+    // Special handling for different line types
+    if (line.type === 'file-header') {
+      return `<div class="${classes}">${escapeHtml(line.content)}</div>`;
+    } else if (line.type === 'separator') {
+      return `<div class="${classes}">${line.content}</div>`;
+    } else {
+      // For add/remove/context lines, show line numbers and content
+      const lineNumDisplay = lineNum ? `${lineNum}`.padStart(4, ' ') : '';
+      return `<div class="${classes}" data-line-number="${lineNum}">
+        <span class="line-number">${lineNumDisplay}</span>
+        <span class="line-content">${escapeHtml(line.content)}</span>
+      </div>`;
+    }
   }).join('');
 }
 
