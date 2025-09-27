@@ -505,6 +505,29 @@ def git_push(ws_id: str, body: GitPushRequest):
         subprocess.run(["git", "config", "user.email", "agent@example.com"], cwd=base_real, check=True)
         subprocess.run(["git", "config", "user.name", "AI Agent"], cwd=base_real, check=True)
         
+        # Configure authentication for GitHub if token is available
+        github_token = os.getenv("GITHUB_TOKEN")
+        if github_token:
+            # Get remote URL to modify it with token
+            remote_result = subprocess.run(
+                ["git", "remote", "get-url", "origin"],
+                cwd=base_real,
+                capture_output=True,
+                text=True,
+                check=True
+            )
+            remote_url = remote_result.stdout.strip()
+            
+            # Convert HTTPS URL to include token
+            if remote_url.startswith("https://github.com/"):
+                auth_url = remote_url.replace("https://github.com/", f"https://token:{github_token}@github.com/")
+                subprocess.run(["git", "remote", "set-url", "origin", auth_url], cwd=base_real, check=True)
+            elif remote_url.startswith("git@github.com:"):
+                # Convert SSH to HTTPS with token
+                repo_path = remote_url.replace("git@github.com:", "")
+                auth_url = f"https://token:{github_token}@github.com/{repo_path}"
+                subprocess.run(["git", "remote", "set-url", "origin", auth_url], cwd=base_real, check=True)
+        
         # Add all changes
         add_result = subprocess.run(["git", "add", "-A"], cwd=base_real, capture_output=True, text=True)
         if add_result.returncode != 0:
@@ -584,8 +607,15 @@ def git_push(ws_id: str, body: GitPushRequest):
                 "stdout": push_result.stdout
             }
         
+        # Restore original remote URL if we modified it
+        if github_token and 'remote_url' in locals():
+            try:
+                subprocess.run(["git", "remote", "set-url", "origin", remote_url], cwd=base_real, check=True)
+            except subprocess.CalledProcessError:
+                pass  # Don't fail the whole operation if we can't restore the URL
+        
         # Get remote URL and create PR if requested
-        remote_result = subprocess.run(
+        final_remote_result = subprocess.run(
             ["git", "remote", "get-url", "origin"],
             cwd=base_real,
             capture_output=True,
@@ -596,9 +626,9 @@ def git_push(ws_id: str, body: GitPushRequest):
         pr_number = None
         pr_created = False
         
-        if remote_result.returncode == 0:
-            remote_url = remote_result.stdout.strip()
-            repo_owner, repo_name = parse_github_url(remote_url)
+        if final_remote_result.returncode == 0:
+            final_remote_url = final_remote_result.stdout.strip()
+            repo_owner, repo_name = parse_github_url(final_remote_url)
             
             if repo_owner and repo_name and body.create_pr:
                 # Try to create PR using GitHub API
@@ -633,11 +663,12 @@ Please review the changes and merge if appropriate.
                             pr_created = "existing"
                 else:
                     # No GitHub token, generate manual PR URL
-                    if remote_url.endswith('.git'):
-                        remote_url = remote_url[:-4]
-                    if remote_url.startswith('git@github.com:'):
-                        remote_url = remote_url.replace('git@github.com:', 'https://github.com/')
-                    pr_url = f"{remote_url}/compare/{current_branch}...{new_branch}?expand=1"
+                    manual_url = final_remote_url
+                    if manual_url.endswith('.git'):
+                        manual_url = manual_url[:-4]
+                    if manual_url.startswith('git@github.com:'):
+                        manual_url = manual_url.replace('git@github.com:', 'https://github.com/')
+                    pr_url = f"{manual_url}/compare/{current_branch}...{new_branch}?expand=1"
         
         return {
             "status": "pushed_to_branch",
