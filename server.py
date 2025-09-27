@@ -168,8 +168,27 @@ def run(req: RunRequest):
     )
     messages = [types.Content(role="user", parts=[types.Part(text=req.prompt)])]
     iters = req.max_iterations or cfg.max_iterations
+    
+    # Enhanced execution tracking
+    execution_log = []
+    completed_steps = []
+    
+    # Add initial planning phase for complex requests
+    if len(req.prompt.split()) > 10:  # For non-trivial requests
+        planning_prompt = f"""Before starting, create a brief plan for this request: "{req.prompt}"
+        
+        Consider:
+        1. What information do I need to gather first?
+        2. What are the main steps to accomplish this?
+        3. How can I verify the solution works?
+        
+        Keep the plan concise (2-4 steps) and then proceed with execution."""
+        
+        messages.append(types.Content(role="user", parts=[types.Part(text=planning_prompt)]))
 
-    for _ in range(iters):
+    for iteration in range(iters):
+        step_start_time = datetime.now()
+        
         resp = client.models.generate_content(
             model="gemini-2.0-flash",
             contents=messages,
@@ -181,17 +200,78 @@ def run(req: RunRequest):
         candidate_msg = resp.candidates[0]
         messages.append(candidate_msg.content)
 
+        # Log this iteration
+        step_log = {
+            "iteration": iteration + 1,
+            "timestamp": step_start_time.isoformat(),
+            "duration_ms": int((datetime.now() - step_start_time).total_seconds() * 1000),
+            "function_calls": [],
+            "has_response": bool(resp.text and resp.text.strip()),
+            "tokens_used": getattr(resp.usage_metadata, "prompt_token_count", 0) if resp.usage_metadata else 0
+        }
+
         if resp.function_calls:
             tool_parts = []
             for fc in resp.function_calls:
-                tool_result = call_function(fc, req.verbose, workspace_root)
-                tool_parts.extend(tool_result.parts)
+                step_log["function_calls"].append({
+                    "name": fc.name,
+                    "args": dict(fc.args) if hasattr(fc, 'args') else {}
+                })
+                
+                try:
+                    tool_result = call_function(fc, req.verbose, workspace_root)
+                    tool_parts.extend(tool_result.parts)
+                    
+                    # Track successful function calls
+                    if fc.name not in [step["function"] for step in completed_steps]:
+                        completed_steps.append({
+                            "function": fc.name,
+                            "iteration": iteration + 1,
+                            "success": True
+                        })
+                        
+                except Exception as e:
+                    # Enhanced error handling with context
+                    error_context = f"Function {fc.name} failed: {str(e)}. Consider alternative approaches or break down the task."
+                    tool_parts.append(types.Part.from_function_response(
+                        name=fc.name,
+                        response={"error": error_context}
+                    ))
+                    step_log["function_calls"][-1]["error"] = str(e)
+            
             messages.append(types.Content(role="tool", parts=tool_parts))
+            execution_log.append(step_log)
+            
+            # Add reflection every few steps for complex tasks
+            if iteration > 0 and iteration % cfg.SUMMARIZE_AFTER_STEPS == 0:
+                reflection_prompt = f"""Progress check (iteration {iteration + 1}):
+                
+                Completed functions: {[step['function'] for step in completed_steps]}
+                
+                Reflect briefly:
+                1. Are we making progress toward the goal?
+                2. Do we need to adjust our approach?
+                3. What should be the next priority?
+                
+                Continue with execution after this brief reflection."""
+                
+                messages.append(types.Content(role="user", parts=[types.Part(text=reflection_prompt)]))
+            
             continue
 
+        # Final response - add execution summary
+        execution_log.append(step_log)
         usage = resp.usage_metadata
+        
         return {
             "final_text": resp.text,
+            "execution_summary": {
+                "total_iterations": iteration + 1,
+                "functions_used": list(set([step["function"] for step in completed_steps])),
+                "total_function_calls": sum(len(log["function_calls"]) for log in execution_log),
+                "execution_time_ms": sum(log["duration_ms"] for log in execution_log)
+            },
+            "execution_log": execution_log if req.verbose else None,
             "usage": {
                 "prompt_tokens": getattr(usage, "prompt_token_count", None),
                 "response_tokens": getattr(usage, "candidates_token_count", None),

@@ -15,11 +15,15 @@ def run_python_file(working_directory, file_path, args=None):
         commands = ["python", abs_file_path]
         if args:
             commands.extend(args)
+        # Get timeout from config
+        from config import FUNCTION_CONFIGS
+        timeout = FUNCTION_CONFIGS.get("run_python_file", {}).get("timeout", 60)
+        
         result = subprocess.run(
             commands,
             capture_output=True,
             text=True,
-            timeout=30,
+            timeout=timeout,
             cwd=abs_working_dir,
         )
         output = []
@@ -32,6 +36,8 @@ def run_python_file(working_directory, file_path, args=None):
             output.append(f"Process exited with code {result.returncode}")
 
         return "\n".join(output) if output else "No output produced."
+    except subprocess.TimeoutExpired:
+        return f"Error: Python file execution timed out after {timeout} seconds"
     except Exception as e:
         return f"Error: executing Python file: {e}"
 
