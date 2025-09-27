@@ -1,238 +1,701 @@
+// Utility functions
 const $ = (id) => document.getElementById(id);
+const $$ = (selector) => document.querySelectorAll(selector);
 
+// State management
+const state = {
+  workspace: '',
+  currentFile: null,
+  selectedTreeItem: null,
+  treeData: null,
+  chatHistory: [],
+  isStreaming: false,
+  monacoLoaded: false,
+  editor: null
+};
+
+// Configuration
+const config = {
+  debounceDelay: 300,
+  maxPromptHeight: 120,
+  monacoTheme: {
+    base: 'vs-dark',
+    inherit: true,
+    rules: [
+      { token: 'comment', foreground: '64748b' },
+      { token: 'string', foreground: '10b981' },
+      { token: 'keyword', foreground: '5e9eff' },
+      { token: 'number', foreground: 'f59e0b' },
+      { token: 'type', foreground: '5e9eff' },
+      { token: 'function', foreground: 'e8eaed' }
+    ],
+    colors: {
+      'editor.background': '#0a0e1a',
+      'editor.foreground': '#e8eaed',
+      'editor.lineHighlightBackground': '#111930',
+      'editor.selectionBackground': '#1f2a4a',
+      'editorLineNumber.foreground': '#64748b',
+      'editorCursor.foreground': '#5e9eff',
+      'editor.inactiveSelectionBackground': '#1a2340'
+    }
+  }
+};
+
+// API helpers
 function base() {
   return $("baseUrl").value.replace(/\/$/, "");
 }
 
-// Health
-let editor;
+async function apiCall(endpoint, options = {}) {
+  try {
+    const response = await fetch(`${base()}${endpoint}`, options);
+    if (!response.ok) {
+      throw new Error(`API Error: ${response.status} ${response.statusText}`);
+    }
+    return response;
+  } catch (error) {
+    showToast(`Network error: ${error.message}`, 'error');
+    throw error;
+  }
+}
 
+// Toast notifications
+function showToast(message, type = 'info') {
+  const toast = $('toast');
+  toast.textContent = message;
+  toast.className = `toast show ${type}`;
+  
+  setTimeout(() => {
+    toast.classList.remove('show');
+  }, 5000);
+}
+
+// Debounce utility
+function debounce(func, delay) {
+  let timeoutId;
+  return function (...args) {
+    clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => func.apply(this, args), delay);
+  };
+}
+
+// Monaco Editor initialization
 function initMonaco() {
+  if (state.monacoLoaded || !window.require) return;
+  
   const monacoEl = $("monaco");
   const fallbackEl = $("fallback");
-  if (typeof require !== "function") {
-    // Monaco failed to load; stick with fallback
-    monacoEl.hidden = true;
-    fallbackEl.setAttribute("aria-hidden", "false");
+  
+  try {
+    require(["vs/editor/editor.main"], function () {
+      // Define custom theme
+      monaco.editor.defineTheme('agentic-dark', config.monacoTheme);
+      
+      state.editor = monaco.editor.create(monacoEl, {
+        value: "",
+        language: "plaintext",
+        theme: "agentic-dark",
+        readOnly: true,
+        automaticLayout: true,
+        minimap: { enabled: false },
+        fontSize: 13,
+        lineHeight: 20,
+        padding: { top: 8, bottom: 8 },
+        scrollBeyondLastLine: false,
+        renderWhitespace: 'selection',
+        fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Monaco, Consolas, "Liberation Mono", monospace'
+      });
+      
+      state.monacoLoaded = true;
+      monacoEl.hidden = false;
+      fallbackEl.style.display = "none";
+      
+      // If there's a pending file to open, open it now
+      if (state.currentFile) {
+        openFile(state.currentFile);
+      }
+    });
+  } catch (error) {
+    console.error('Monaco initialization failed:', error);
+    // Keep fallback visible
+  }
+}
+
+// Language detection
+function guessLanguage(path) {
+  const ext = (path.split('.').pop() || '').toLowerCase();
+  const langMap = {
+    js: 'javascript', mjs: 'javascript', cjs: 'javascript',
+    ts: 'typescript', tsx: 'typescript',
+    jsx: 'javascript',
+    py: 'python', pyw: 'python',
+    rb: 'ruby',
+    go: 'go',
+    rs: 'rust',
+    java: 'java',
+    c: 'c', h: 'c',
+    cpp: 'cpp', cc: 'cpp', cxx: 'cpp', hpp: 'cpp',
+    cs: 'csharp',
+    php: 'php',
+    swift: 'swift',
+    kt: 'kotlin',
+    r: 'r',
+    m: 'objective-c',
+    scala: 'scala',
+    sh: 'shell', bash: 'shell', zsh: 'shell',
+    ps1: 'powershell',
+    sql: 'sql',
+    md: 'markdown', markdown: 'markdown',
+    json: 'json',
+    xml: 'xml', svg: 'xml',
+    html: 'html', htm: 'html',
+    css: 'css', scss: 'scss', sass: 'sass', less: 'less',
+    yml: 'yaml', yaml: 'yaml',
+    toml: 'toml',
+    ini: 'ini', cfg: 'ini',
+    dockerfile: 'dockerfile',
+    makefile: 'makefile',
+    cmake: 'cmake',
+    gradle: 'groovy',
+    vue: 'vue',
+    lua: 'lua',
+    dart: 'dart',
+    elm: 'elm',
+    clj: 'clojure',
+    ex: 'elixir', exs: 'elixir'
+  };
+  
+  // Check full filename for special cases
+  const filename = path.split('/').pop().toLowerCase();
+  if (filename === 'dockerfile') return 'dockerfile';
+  if (filename === 'makefile' || filename === 'gnumakefile') return 'makefile';
+  if (filename === 'cmakelists.txt') return 'cmake';
+  
+  return langMap[ext] || 'plaintext';
+}
+
+// File operations
+async function openFile(path) {
+  if (!state.workspace || !path) return;
+  
+  state.currentFile = path;
+  updateBreadcrumbs(path);
+  showViewerLoading(true);
+  
+  try {
+    const response = await apiCall(`/v1/workspaces/${state.workspace}/file?path=${encodeURIComponent(path)}`);
+    const data = await response.json();
+    
+    if (data && typeof data.content === 'string') {
+      renderCode(data.content, path);
+      $("activePath").textContent = path.split('/').pop() || path;
+      selectTreeItem(path);
+    }
+  } catch (error) {
+    console.error('File open error:', error);
+    renderCode(`Error loading file: ${error.message}`, path);
+  } finally {
+    showViewerLoading(false);
+  }
+}
+
+function renderCode(content, path) {
+  if (state.monacoLoaded && state.editor) {
+    const language = guessLanguage(path);
+    const model = monaco.editor.createModel(content, language);
+    state.editor.setModel(model);
+  } else {
+    // Fallback rendering
+    const lines = content.split('\n');
+    const gutter = $('gutter');
+    const code = $('fileOut');
+    
+    // Generate line numbers
+    gutter.innerHTML = lines.map((_, i) => `<div>${i + 1}</div>`).join('');
+    code.textContent = content;
+    
+    // Lazy load Monaco on first file open
+    if (!state.monacoLoaded) {
+      initMonaco();
+    }
+  }
+}
+
+function showViewerLoading(show) {
+  const loading = $('viewerLoading');
+  const viewer = $('viewer');
+  
+  if (show) {
+    loading.classList.remove('hidden');
+    viewer.classList.add('hidden');
+  } else {
+    loading.classList.add('hidden');
+    viewer.classList.remove('hidden');
+  }
+}
+
+// Breadcrumbs
+function updateBreadcrumbs(path) {
+  const breadcrumbs = $('breadcrumbs');
+  if (!path) {
+    breadcrumbs.innerHTML = '<span>No file selected</span>';
     return;
   }
-  if (editor) return;
-  require(["vs/editor/editor.main"], function () {
-    editor = monaco.editor.create(monacoEl, {
-      value: "",
-      language: "plaintext",
-      theme: "vs-dark",
-      readOnly: true,
-      automaticLayout: true,
-      minimap: { enabled: false },
-      fontSize: 13,
+  
+  const parts = path.split('/').filter(Boolean);
+  const elements = [];
+  
+  parts.forEach((part, index) => {
+    const isLast = index === parts.length - 1;
+    const currentPath = parts.slice(0, index + 1).join('/');
+    
+    if (isLast) {
+      elements.push(`<span>${part}</span>`);
+    } else {
+      elements.push(`<a href="#" data-path="${currentPath}">${part}</a>`);
+      elements.push('<span class="separator">/</span>');
+    }
+  });
+  
+  breadcrumbs.innerHTML = `<span>${elements.join('')}</span>`;
+  
+  // Add click handlers
+  breadcrumbs.querySelectorAll('a').forEach(link => {
+    link.addEventListener('click', (e) => {
+      e.preventDefault();
+      // Could implement folder navigation here
     });
-    // Show Monaco, hide fallback
-    monacoEl.hidden = false;
-    fallbackEl.setAttribute("aria-hidden", "true");
-    fallbackEl.style.display = "none";
   });
 }
 
-document.addEventListener("DOMContentLoaded", initMonaco);
-
-$("healthBtn").onclick = async () => {
-  try {
-    const r = await fetch(`${base()}/healthz`);
-    const text = await r.text();
-    $("healthBadge").textContent = r.ok ? "ok" : `err ${r.status}`;
-    $("healthBadge").style.color = r.ok ? "#8fff8f" : "#ff8f8f";
-  } catch (e) {
-    $("healthBadge").textContent = "err";
-    $("healthBadge").style.color = "#ff8f8f";
-  }
-};
-
-// Upload
-$("uploadBtn").onclick = async () => {
-  const f = $("zipFile").files[0];
-  if (!f) return alert("Choose a .zip first");
-  const fd = new FormData();
-  fd.append("zip_file", f);
-  try {
-    const r = await fetch(`${base()}/v1/workspaces/upload`, { method: "POST", body: fd });
-    const j = await r.json();
-    if (j.workspace_id) {
-      $("ws").value = j.workspace_id;
-      await refreshTree();
-    }
-  } catch (e) {
-    console.error(e);
-    alert("Upload failed: " + e);
-  }
-};
-
-// Clone
-$("cloneBtn").onclick = async () => {
-  const repo = $("repoUrl").value.trim();
-  const branch = $("branch").value.trim() || "main";
-  if (!repo) return ($("cloneOut").textContent = "Enter repo URL");
-  try {
-    const r = await fetch(`${base()}/v1/workspaces/clone`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ repo_url: repo, branch }),
-    });
-    const j = await r.json();
-    if (j.workspace_id) {
-      $("ws").value = j.workspace_id;
-      await refreshTree();
-    }
-  } catch (e) {
-    console.error(e);
-    alert("Clone failed: " + e);
-  }
-};
-
-// Tree
+// Tree operations
 async function refreshTree() {
-  const ws = $("ws").value.trim();
-  if (!ws) return;
+  if (!state.workspace) return;
+  
+  showTreeLoading(true);
+  
   try {
-    const r = await fetch(`${base()}/v1/workspaces/${ws}/tree`);
-    const j = await r.json();
-    renderTree(j.entries || []);
-  } catch (e) {
-    $("tree").textContent = String(e);
+    const response = await apiCall(`/v1/workspaces/${state.workspace}/tree`);
+    const data = await response.json();
+    state.treeData = data.entries || [];
+    renderTree(state.treeData);
+  } catch (error) {
+    $("tree").innerHTML = `<div class="error">Error loading tree: ${error.message}</div>`;
+  } finally {
+    showTreeLoading(false);
   }
 }
 
-$("treeBtn").onclick = refreshTree;
+const debouncedRefreshTree = debounce(refreshTree, config.debounceDelay);
 
-// Open file helper
-async function openFile(path) {
-  const ws = $("ws").value.trim();
-  if (!ws || !path) return;
-  try {
-    const r = await fetch(`${base()}/v1/workspaces/${ws}/file?path=${encodeURIComponent(path)}`);
-    const j = await r.json();
-    if (j && typeof j.content === 'string') {
-      if (editor) {
-        const lang = guessLanguage(path);
-        monaco.editor.setModelLanguage(editor.getModel(), lang);
-        editor.setValue(j.content);
-      } else {
-        renderCode(j.content);
-      }
-      $("activePath").textContent = path;
-    }
-  } catch (e) {
-    console.error(e);
-    $("fileOut").textContent = String(e);
+function showTreeLoading(show) {
+  const loading = $('treeLoading');
+  const tree = $('tree');
+  
+  if (show) {
+    loading.classList.remove('hidden');
+    tree.classList.add('hidden');
+  } else {
+    loading.classList.add('hidden');
+    tree.classList.remove('hidden');
   }
 }
 
-// Run prompt
-$("runBtn").onclick = async () => {
-  const ws = $("ws").value.trim();
-  const prompt = $("prompt").value;
-  if (!ws || !prompt) return ($("runOut").textContent = "Set workspace_id and prompt");
-  addChatBubble("user", prompt);
-  try {
-    const r = await fetch(`${base()}/v1/run`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ prompt, workspace: ws }),
-    });
-    const j = await r.json();
-    $("runOut").textContent = JSON.stringify(j, null, 2);
-    // Refresh tree in case run wrote files
-    await refreshTree();
-    if (j && j.final_text) addChatBubble("assistant", j.final_text);
-  } catch (e) {
-    $("runOut").textContent = String(e);
-  }
-};
-
-// send on Ctrl/Cmd+Enter
-$("prompt").addEventListener("keydown", (e) => {
-  if ((e.ctrlKey || e.metaKey) && e.key === "Enter") { $("runBtn").click(); }
-});
-
-// update tree when workspace id changes (blur)
-$("ws").addEventListener("change", refreshTree);
-$("ws").addEventListener("blur", refreshTree);
-
-// --- Tree rendering ---
 function renderTree(entries) {
-  // Build a nested structure from flat paths like a/b/c.txt
-  const root = {};
-  for (const p of entries) {
-    const parts = p.split("/");
+  const root = buildTreeStructure(entries);
+  const treeEl = $("tree");
+  treeEl.innerHTML = "";
+  
+  if (!entries.length) {
+    treeEl.innerHTML = '<div style="padding: 8px; color: var(--text-tertiary);">No files</div>';
+    return;
+  }
+  
+  const ul = document.createElement("ul");
+  ul.setAttribute('role', 'group');
+  treeEl.appendChild(ul);
+  renderTreeNode(root, ul, "");
+}
+
+function buildTreeStructure(entries) {
+  const root = { children: {} };
+  
+  for (const path of entries) {
+    const parts = path.split("/").filter(Boolean);
     let node = root;
+    
     for (let i = 0; i < parts.length; i++) {
       const part = parts[i];
-      const isFile = i === parts.length - 1 && !p.endsWith("/");
-      node.children = node.children || {};
-      node.children[part] = node.children[part] || { name: part, children: {} };
-      if (isFile) node.children[part].file = true;
+      const isFile = i === parts.length - 1 && !path.endsWith("/");
+      
+      if (!node.children[part]) {
+        node.children[part] = {
+          name: part,
+          children: {},
+          file: isFile
+        };
+      }
+      
       node = node.children[part];
     }
   }
-  const treeEl = $("tree");
-  treeEl.innerHTML = "";
-  if (!entries.length) { treeEl.textContent = "No files"; return; }
-  const ul = document.createElement("ul");
-  ul.style.listStyle = "none";
-  ul.style.margin = 0; ul.style.paddingLeft = "6px";
-  ul.style.maxHeight = "calc(100vh - 200px)";
-  ul.style.overflow = "auto";
-  treeEl.appendChild(ul);
-  renderNode(root, ul, "");
+  
+  return root;
 }
 
-function renderNode(node, parentEl, prefix) {
+function renderTreeNode(node, parentEl, prefix) {
   if (!node.children) return;
-  const names = Object.keys(node.children).sort((a,b) => {
-    const A = node.children[a], B = node.children[b];
-    if (!!A.file === !!B.file) return a.localeCompare(b);
-    return A.file ? 1 : -1; // dirs first
+  
+  const entries = Object.entries(node.children).sort(([nameA, nodeA], [nameB, nodeB]) => {
+    // Directories first, then alphabetical
+    if (nodeA.file === nodeB.file) return nameA.localeCompare(nameB);
+    return nodeA.file ? 1 : -1;
   });
-  for (const name of names) {
-    const child = node.children[name];
+  
+  for (const [name, child] of entries) {
     const li = document.createElement("li");
+    li.setAttribute('role', 'treeitem');
+    
     if (child.file) {
       li.className = "file";
       li.textContent = name;
-      li.onclick = () => openFile(`${prefix}${name}`);
+      li.dataset.path = `${prefix}${name}`;
+      li.tabIndex = 0;
+      
+      li.addEventListener('click', () => openFile(`${prefix}${name}`));
+      li.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          openFile(`${prefix}${name}`);
+        }
+      });
+      
       parentEl.appendChild(li);
     } else {
       li.className = "dir";
-      li.textContent = `▸ ${name}`;
-      const sub = document.createElement("ul");
-      sub.style.listStyle = "none"; sub.style.margin = 0; sub.style.paddingLeft = "14px";
-      let open = false;
+      li.setAttribute('aria-expanded', 'false');
+      li.tabIndex = 0;
+      
+      const span = document.createElement('span');
+      span.textContent = `▸ ${name}`;
+      li.appendChild(span);
+      
+      const subUl = document.createElement("ul");
+      subUl.setAttribute('role', 'group');
+      subUl.style.display = 'none';
+      subUl.style.paddingLeft = '14px';
+      
       const toggle = () => {
-        open = !open; sub.style.display = open ? "block" : "none";
-        li.textContent = `${open ? "▾" : "▸"} ${name}`;
+        const isOpen = li.getAttribute('aria-expanded') === 'true';
+        li.setAttribute('aria-expanded', !isOpen);
+        subUl.style.display = isOpen ? 'none' : 'block';
+        span.textContent = `${isOpen ? '▸' : '▾'} ${name}`;
       };
-      li.onclick = toggle; toggle(); // start collapsed
+      
+      li.addEventListener('click', (e) => {
+        if (e.target === li || e.target === span) {
+          toggle();
+        }
+      });
+      
+      li.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          toggle();
+        } else if (e.key === 'ArrowRight' && li.getAttribute('aria-expanded') === 'false') {
+          toggle();
+        } else if (e.key === 'ArrowLeft' && li.getAttribute('aria-expanded') === 'true') {
+          toggle();
+        }
+      });
+      
       parentEl.appendChild(li);
-      parentEl.appendChild(sub);
-      renderNode(child, sub, `${prefix}${name}/`);
+      parentEl.appendChild(subUl);
+      renderTreeNode(child, subUl, `${prefix}${name}/`);
     }
   }
 }
 
-function addChatBubble(role, text) {
-  const c = $("chatMessages");
-  const div = document.createElement("div");
-  div.style.margin = "6px 0";
-  div.style.whiteSpace = "pre-wrap";
-  div.textContent = (role === "user" ? "You: " : "Assistant: ") + text;
-  c.appendChild(div);
-  c.scrollTop = c.scrollHeight;
+function selectTreeItem(path) {
+  // Remove previous selection
+  if (state.selectedTreeItem) {
+    state.selectedTreeItem.classList.remove('selected');
+  }
+  
+  // Find and select new item
+  const item = document.querySelector(`[data-path="${path}"]`);
+  if (item) {
+    item.classList.add('selected');
+    state.selectedTreeItem = item;
+    item.scrollIntoView({ block: 'nearest' });
+  }
 }
 
-function guessLanguage(path) {
-  const ext = (path.split('.').pop() || '').toLowerCase();
-  const map = { js: 'javascript', ts: 'typescript', py: 'python', md: 'markdown', json: 'json', yml: 'yaml', yaml: 'yaml', html: 'html', css: 'css' };
-  return map[ext] || 'plaintext';
+// Chat operations
+function addChatBubble(role, text, timestamp = new Date()) {
+  const messages = $("chatMessages");
+  const bubble = document.createElement("div");
+  bubble.className = `chat-bubble ${role}`;
+  
+  const meta = document.createElement("div");
+  meta.className = "meta";
+  meta.textContent = `${role === 'user' ? 'You' : 'Assistant'} • ${timestamp.toLocaleTimeString()}`;
+  
+  const content = document.createElement("div");
+  content.className = "content";
+  content.textContent = text;
+  
+  bubble.appendChild(meta);
+  bubble.appendChild(content);
+  messages.appendChild(bubble);
+  
+  // Scroll to bottom
+  messages.scrollTop = messages.scrollHeight;
+  
+  // Add to history
+  state.chatHistory.push({ role, text, timestamp });
 }
 
+function addStreamingBubble() {
+  const messages = $("chatMessages");
+  const bubble = document.createElement("div");
+  bubble.className = "chat-bubble assistant";
+  bubble.id = "streamingBubble";
+  
+  const meta = document.createElement("div");
+  meta.className = "meta";
+  meta.textContent = `Assistant • ${new Date().toLocaleTimeString()}`;
+  
+  const content = document.createElement("div");
+  content.className = "content";
+  content.innerHTML = '<div class="streaming"><span></span><span></span><span></span></div> Thinking...';
+  
+  bubble.appendChild(meta);
+  bubble.appendChild(content);
+  messages.appendChild(bubble);
+  
+  messages.scrollTop = messages.scrollHeight;
+  
+  return bubble;
+}
 
+function updateStreamingBubble(text) {
+  const bubble = $("streamingBubble");
+  if (bubble) {
+    const content = bubble.querySelector('.content');
+    content.textContent = text;
+  }
+}
+
+function removeStreamingBubble() {
+  const bubble = $("streamingBubble");
+  if (bubble) {
+    bubble.remove();
+  }
+}
+
+async function sendPrompt() {
+  const prompt = $("prompt").value.trim();
+  if (!state.workspace || !prompt || state.isStreaming) return;
+  
+  state.isStreaming = true;
+  $("runBtn").disabled = true;
+  $("prompt").value = "";
+  
+  addChatBubble("user", prompt);
+  const streamingBubble = addStreamingBubble();
+  
+  try {
+    const response = await apiCall("/v1/run", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ prompt, workspace: state.workspace })
+    });
+    
+    const data = await response.json();
+    
+    removeStreamingBubble();
+    
+    if (data && data.final_text) {
+      addChatBubble("assistant", data.final_text);
+    } else {
+      addChatBubble("assistant", "I completed the task.");
+    }
+    
+    // Show raw output if debug mode
+    if (data && Object.keys(data).length > 1) {
+      $("runOut").textContent = JSON.stringify(data, null, 2);
+      $("runOut").classList.remove('hidden');
+    }
+    
+    // Refresh tree after operations
+    await debouncedRefreshTree();
+    
+  } catch (error) {
+    removeStreamingBubble();
+    addChatBubble("assistant", `Error: ${error.message}`);
+  } finally {
+    state.isStreaming = false;
+    $("runBtn").disabled = false;
+    $("prompt").focus();
+  }
+}
+
+// Workspace operations
+async function uploadWorkspace() {
+  const file = $("zipFile").files[0];
+  if (!file) {
+    showToast("Please select a ZIP file first", "warning");
+    return;
+  }
+  
+  const formData = new FormData();
+  formData.append("zip_file", file);
+  
+  try {
+    const response = await apiCall("/v1/workspaces/upload", {
+      method: "POST",
+      body: formData
+    });
+    
+    const data = await response.json();
+    if (data.workspace_id) {
+      state.workspace = data.workspace_id;
+      $("ws").value = data.workspace_id;
+      showToast("Workspace uploaded successfully", "success");
+      await refreshTree();
+    }
+  } catch (error) {
+    showToast(`Upload failed: ${error.message}`, "error");
+  }
+}
+
+async function cloneRepository() {
+  const repoUrl = $("repoUrl").value.trim();
+  const branch = $("branch").value.trim() || "main";
+  
+  if (!repoUrl) {
+    showToast("Please enter a repository URL", "warning");
+    return;
+  }
+  
+  try {
+    const response = await apiCall("/v1/workspaces/clone", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ repo_url: repoUrl, branch })
+    });
+    
+    const data = await response.json();
+    if (data.workspace_id) {
+      state.workspace = data.workspace_id;
+      $("ws").value = data.workspace_id;
+      showToast("Repository cloned successfully", "success");
+      await refreshTree();
+    }
+  } catch (error) {
+    showToast(`Clone failed: ${error.message}`, "error");
+  }
+}
+
+async function checkHealth() {
+  try {
+    const response = await apiCall("/healthz");
+    const text = await response.text();
+    $("healthBadge").textContent = "✓ Connected";
+    $("healthBadge").style.color = "var(--success)";
+  } catch (error) {
+    $("healthBadge").textContent = "✗ Disconnected";
+    $("healthBadge").style.color = "var(--error)";
+  }
+}
+
+// Auto-resize textarea
+function autoResizeTextarea() {
+  const textarea = $("prompt");
+  textarea.style.height = 'auto';
+  const newHeight = Math.min(textarea.scrollHeight, config.maxPromptHeight);
+  textarea.style.height = newHeight + 'px';
+}
+
+// Event listeners
+document.addEventListener("DOMContentLoaded", () => {
+  // Initialize
+  checkHealth();
+  
+  // Load saved state
+  const savedUrl = localStorage.getItem('baseUrl');
+  const savedWorkspace = localStorage.getItem('workspace');
+  
+  if (savedUrl) $("baseUrl").value = savedUrl;
+  if (savedWorkspace) {
+    $("ws").value = savedWorkspace;
+    state.workspace = savedWorkspace;
+    refreshTree();
+  }
+  
+  // Health check
+  $("healthBtn").addEventListener('click', checkHealth);
+  
+  // Workspace operations
+  $("uploadBtn").addEventListener('click', uploadWorkspace);
+  $("cloneBtn").addEventListener('click', cloneRepository);
+  $("treeBtn").addEventListener('click', refreshTree);
+  
+  // Workspace input
+  $("ws").addEventListener('change', (e) => {
+    state.workspace = e.target.value.trim();
+    localStorage.setItem('workspace', state.workspace);
+    if (state.workspace) refreshTree();
+  });
+  
+  $("ws").addEventListener('blur', (e) => {
+    const newValue = e.target.value.trim();
+    if (newValue !== state.workspace) {
+      state.workspace = newValue;
+      localStorage.setItem('workspace', state.workspace);
+      if (state.workspace) refreshTree();
+    }
+  });
+  
+  // Base URL
+  $("baseUrl").addEventListener('change', (e) => {
+    localStorage.setItem('baseUrl', e.target.value);
+  });
+  
+  // Chat
+  $("runBtn").addEventListener('click', sendPrompt);
+  $("prompt").addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      e.preventDefault();
+      sendPrompt();
+    }
+  });
+  
+  $("prompt").addEventListener('input', autoResizeTextarea);
+  
+  // Global keyboard shortcuts
+  document.addEventListener('keydown', (e) => {
+    // Refresh tree: Ctrl/Cmd + R
+    if ((e.ctrlKey || e.metaKey) && e.key === 'r') {
+      e.preventDefault();
+      refreshTree();
+    }
+    
+    // Focus prompt: Alt + P
+    if (e.altKey && e.key === 'p') {
+      e.preventDefault();
+      $("prompt").focus();
+    }
+  });
+  
+  // Initialize Monaco after a short delay
+  setTimeout(initMonaco, 100);
+});
+
+// Handle visibility change to refresh on return
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && state.workspace) {
+    checkHealth();
+  }
+});

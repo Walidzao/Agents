@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Agentic Code Assistant UI</title>
+  <title>Agentic Code Assistant</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -20,57 +20,79 @@
     </header>
 
     <main class="layout">
-      <aside class="explorer">
+      <!-- Explorer Panel -->
+      <aside class="explorer" role="navigation" aria-label="File Explorer">
         <div class="explorer-header">
           <div class="row">
-            <input id="ws" type="text" placeholder="workspace_id" />
+            <input id="ws" type="text" placeholder="workspace_id" aria-label="Workspace ID" />
           </div>
           <div class="row">
-            <input id="repoUrl" type="text" placeholder="https://github.com/user/repo.git" />
-            <input id="branch" type="text" value="main" />
+            <input id="repoUrl" type="text" placeholder="https://github.com/user/repo.git" aria-label="Repository URL" />
+            <input id="branch" type="text" value="main" placeholder="branch" aria-label="Branch" style="width: 80px;" />
           </div>
           <div class="row">
-            <input id="zipFile" type="file" accept=".zip" />
+            <input id="zipFile" type="file" accept=".zip" aria-label="Upload ZIP file" />
           </div>
           <div class="row">
             <button id="uploadBtn">Upload</button>
             <button id="cloneBtn">Clone</button>
-            <button id="treeBtn">Refresh</button>
+            <button id="treeBtn" aria-label="Refresh file tree">Refresh</button>
           </div>
         </div>
-        <div id="tree" class="tree"></div>
+        <div id="treeLoading" class="tree-loading hidden">
+          <div class="skeleton" style="height: 20px; margin: 8px;"></div>
+          <div class="skeleton" style="height: 20px; margin: 8px;"></div>
+          <div class="skeleton" style="height: 20px; margin: 8px;"></div>
+        </div>
+        <div id="tree" class="tree" role="tree" aria-label="File tree"></div>
       </aside>
 
-      <section class="editor">
+      <!-- Editor Panel -->
+      <section class="editor" role="main">
+        <div class="breadcrumbs" id="breadcrumbs" aria-label="File path">
+          <span>No file selected</span>
+        </div>
         <div class="tabs">
           <div id="activePath" class="tab">No file</div>
         </div>
+        <div id="viewerLoading" class="viewer-loading hidden">
+          <div style="padding: 20px;">
+            <div class="skeleton" style="height: 16px; margin-bottom: 8px;"></div>
+            <div class="skeleton" style="height: 16px; width: 80%; margin-bottom: 8px;"></div>
+            <div class="skeleton" style="height: 16px; width: 60%;"></div>
+          </div>
+        </div>
         <div id="viewer" class="viewer">
           <div id="monaco" class="monaco" hidden></div>
-          <div id="fallback" class="fallback" aria-hidden="true">
+          <div id="fallback" class="fallback">
             <div id="gutter" class="gutter"></div>
             <pre id="fileOut" class="code"></pre>
           </div>
         </div>
       </section>
 
-      <section class="chat">
-        <div class="chat-messages" id="chatMessages"></div>
+      <!-- Chat Panel -->
+      <section class="chat" role="complementary" aria-label="Chat with assistant">
+        <div class="chat-messages" id="chatMessages" role="log" aria-live="polite"></div>
         <div class="chat-input">
-          <textarea id="prompt" rows="3" placeholder="Ask the assistant…"></textarea>
-          <button id="runBtn">Send</button>
+          <textarea 
+            id="prompt" 
+            placeholder="Ask the assistant to help with your code..."
+            aria-label="Chat prompt"
+          ></textarea>
+          <button id="runBtn" aria-label="Send message">Send</button>
         </div>
-        <pre id="runOut" class="scroll"></pre>
+        <pre id="runOut" class="scroll hidden"></pre>
       </section>
     </main>
   </div>
 
-  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <!-- Toast notifications -->
+  <div id="toast" class="toast" role="alert" aria-live="assertive"></div>
 
-  <script>window.require={paths:{vs:"https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs"}};</script>
+  <!-- Monaco Editor -->
+  <script>window.require = { paths: { vs: "https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs" } };</script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs/loader.min.js"></script>
   <script src="main.js"></script>
-  </body>
-  </html>
-
-
+</body>
+</html>
