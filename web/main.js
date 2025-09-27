@@ -87,8 +87,19 @@ async function fetchGitStatus() {
   if (!state.workspace) return;
   
   try {
-    const response = await apiCall(`/v1/workspaces/${state.workspace}/git/status`);
+    console.log('Fetching git status for workspace:', state.workspace);
+    const response = await fetch(`${base()}/v1/workspaces/${state.workspace}/git/status`);
+    
+    if (!response.ok) {
+      if (response.status === 404) {
+        console.log('Git status endpoint not found - feature not deployed yet');
+        return null;
+      }
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+    
     const data = await response.json();
+    console.log('Git status response:', data);
     state.gitStatus = data;
     
     if (data.is_git) {
@@ -98,14 +109,19 @@ async function fetchGitStatus() {
       
       // Update file status markers in tree
       updateFileStatusMarkers(data.files);
+      console.log('Updated file status markers for', Object.keys(data.files || {}).length, 'files');
     } else {
       $('gitToolbar').classList.add('hidden');
       $('downloadDiffBtn').classList.add('hidden');
+      console.log('Workspace is not a git repository');
     }
     
     return data;
   } catch (error) {
     console.error('Git status error:', error);
+    // Hide git features if endpoint is not available
+    $('gitToolbar').classList.add('hidden');
+    $('downloadDiffBtn').classList.add('hidden');
     return null;
   }
 }
@@ -134,7 +150,7 @@ function updateFileStatusMarkers(fileStatuses) {
     const parts = path.split('/');
     for (let i = parts.length - 1; i > 0; i--) {
       const dirPath = parts.slice(0, i).join('/');
-      const dirEls = $$('.dir').filter(el => 
+      const dirEls = Array.from($$('.dir')).filter(el => 
         el.textContent.includes(parts[i-1]) && 
         el.parentElement.querySelector(`[data-path^="${dirPath}/"]`)
       );
@@ -258,11 +274,16 @@ async function downloadWorkspace(format = 'zip') {
   }
   
   try {
+    console.log(`Attempting to download workspace as ${format}`);
     const response = await fetch(`${base()}/v1/workspaces/${state.workspace}/download?format=${format}`, {
       method: 'POST'
     });
     
     if (!response.ok) {
+      if (response.status === 404) {
+        showToast('Download feature not available yet - deployment in progress', 'warning');
+        return;
+      }
       throw new Error(`Download failed: ${response.statusText}`);
     }
     
@@ -278,6 +299,7 @@ async function downloadWorkspace(format = 'zip') {
     
     showToast(`Downloaded workspace as ${format}`, 'success');
   } catch (error) {
+    console.error('Download error:', error);
     showToast(`Download failed: ${error.message}`, 'error');
   }
 }
