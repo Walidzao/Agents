@@ -122,14 +122,27 @@
   <!-- Commit Modal -->
   <div id="commitModal" class="modal hidden" role="dialog" aria-modal="true">
     <div class="modal-content">
-      <h3>Commit & Push Changes</h3>
+      <h3>Commit & Create Pull Request</h3>
       <div class="form-group">
         <label for="commitMessage">Commit message:</label>
         <textarea id="commitMessage" placeholder="Describe your changes..." rows="3"></textarea>
       </div>
       <div class="form-group">
-        <label for="targetBranch">Branch (optional):</label>
-        <input id="targetBranch" type="text" placeholder="Leave empty to use current branch" />
+        <label for="prTitle">PR Title (optional):</label>
+        <input id="prTitle" type="text" placeholder="Will use commit message if empty" />
+      </div>
+      <div class="form-group">
+        <label for="targetBranch">Branch name (optional):</label>
+        <input id="targetBranch" type="text" placeholder="Auto-generated if empty" />
+      </div>
+      <div class="form-group">
+        <label>
+          <input id="createPrCheckbox" type="checkbox" checked />
+          Create Pull Request automatically
+        </label>
+        <small style="color: var(--text-tertiary); display: block; margin-top: 4px;">
+          Requires GITHUB_TOKEN environment variable on server
+        </small>
       </div>
       <div class="modal-actions">
         <button id="cancelCommitBtn">Cancel</button>

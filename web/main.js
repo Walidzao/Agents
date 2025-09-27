@@ -431,22 +431,38 @@ function hideCommitModal() {
   modal.classList.add('hidden');
   $('commitMessage').value = '';
   $('targetBranch').value = '';
+  $('prTitle').value = '';
+  $('createPrCheckbox').checked = true;
 }
 
 async function commitAndPush() {
   const message = $('commitMessage').value.trim();
   const branch = $('targetBranch').value.trim();
+  const prTitle = $('prTitle').value.trim();
+  const createPr = $('createPrCheckbox').checked;
   
   if (!message) {
     showToast('Please enter a commit message', 'warning');
     return;
   }
   
+  // Disable button to prevent double-submission
+  $('confirmCommitBtn').disabled = true;
+  $('confirmCommitBtn').textContent = 'Processing...';
+  
   try {
+    const requestBody = {
+      message,
+      create_pr: createPr
+    };
+    
+    if (branch) requestBody.branch = branch;
+    if (prTitle) requestBody.pr_title = prTitle;
+    
     const response = await apiCall(`/v1/workspaces/${state.workspace}/git/push`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message, branch })
+      body: JSON.stringify(requestBody)
     });
     
     const data = await response.json();
@@ -458,29 +474,47 @@ async function commitAndPush() {
       showToast('No changes to commit', 'info');
     } else if (data.status === 'pushed_to_branch') {
       showToast(`Successfully pushed to branch '${data.branch}'`, 'success');
-      if (data.pr_url) {
-        // Show PR URL as a clickable link
+      
+      if (data.pr_created === true) {
+        // PR was successfully created
         setTimeout(() => {
-          const prMessage = `PR ready: ${data.pr_url}`;
-          showToast(prMessage, 'success');
-          console.log('PR URL:', data.pr_url);
+          showToast(`✅ PR #${data.pr_number} created successfully!`, 'success');
+          addChatBubble('system', `Pull Request created: ${data.pr_url}`);
         }, 1000);
-      } else if (data.pr_instructions) {
-        showToast(data.pr_instructions, 'info');
+      } else if (data.pr_created === 'existing') {
+        // PR already existed
+        setTimeout(() => {
+          showToast(`📋 PR #${data.pr_number} already exists`, 'info');
+          addChatBubble('system', `Existing Pull Request: ${data.pr_url}`);
+        }, 1000);
+      } else if (data.pr_url && !data.pr_created) {
+        // Manual PR URL (no GitHub token)
+        setTimeout(() => {
+          showToast('📝 Click to create PR manually', 'info');
+          addChatBubble('system', `Create PR manually: ${data.pr_url}`);
+        }, 1000);
       }
+      
       // Refresh git status
       await fetchGitStatus();
       await refreshTree();
-    } else if (data.status === 'commit_failed' || data.status === 'push_failed') {
-      showToast(`${data.message}`, 'error');
-      console.error('Git operation details:', data);
+    } else if (data.status === 'commit_failed') {
+      showToast(`Commit failed: ${data.message}`, 'error');
+      console.error('Commit details:', data);
+    } else if (data.status === 'push_failed') {
+      showToast(`Push failed: ${data.message}`, 'error');
+      console.error('Push details:', data);
     } else if (data.status === 'error') {
       showToast(`Error: ${data.message}`, 'error');
       console.error('Git error details:', data);
     }
   } catch (error) {
     console.error('Commit/push error:', error);
-    showToast(`Push failed: ${error.message}`, 'error');
+    showToast(`Operation failed: ${error.message}`, 'error');
+  } finally {
+    // Re-enable button
+    $('confirmCommitBtn').disabled = false;
+    $('confirmCommitBtn').textContent = 'Commit & Push';
   }
 }
 

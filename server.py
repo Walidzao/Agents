@@ -11,6 +11,8 @@ import zipfile
 import subprocess
 import json
 import tempfile
+import requests
+import re
 from datetime import datetime
 from dotenv import load_dotenv
 from google import genai
@@ -402,9 +404,82 @@ def download_workspace(ws_id: str, format: str = Query("zip", regex="^(zip|diff)
 class GitPushRequest(BaseModel):
     message: str
     branch: Optional[str] = None
-    create_pr: bool = False
+    create_pr: bool = True  # Default to creating PR
     pr_title: Optional[str] = None
     pr_body: Optional[str] = None
+
+def create_github_pr(repo_owner, repo_name, head_branch, base_branch, title, body, github_token):
+    """Create a GitHub Pull Request using the GitHub API"""
+    url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/pulls"
+    
+    headers = {
+        "Authorization": f"token {github_token}",
+        "Accept": "application/vnd.github.v3+json",
+        "Content-Type": "application/json"
+    }
+    
+    data = {
+        "title": title,
+        "head": head_branch,
+        "base": base_branch,
+        "body": body,
+        "maintainer_can_modify": True
+    }
+    
+    try:
+        response = requests.post(url, headers=headers, json=data, timeout=30)
+        if response.status_code == 201:
+            pr_data = response.json()
+            return {
+                "success": True,
+                "pr_url": pr_data["html_url"],
+                "pr_number": pr_data["number"]
+            }
+        elif response.status_code == 422:
+            # PR might already exist
+            error_data = response.json()
+            if "pull request already exists" in error_data.get("message", "").lower():
+                # Try to find existing PR
+                existing_prs_url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/pulls?head={repo_owner}:{head_branch}&base={base_branch}"
+                existing_response = requests.get(existing_prs_url, headers=headers, timeout=30)
+                if existing_response.status_code == 200:
+                    prs = existing_response.json()
+                    if prs:
+                        return {
+                            "success": True,
+                            "pr_url": prs[0]["html_url"],
+                            "pr_number": prs[0]["number"],
+                            "existing": True
+                        }
+            return {
+                "success": False,
+                "error": f"GitHub API error: {error_data.get('message', 'Unknown error')}"
+            }
+        else:
+            return {
+                "success": False,
+                "error": f"GitHub API error: {response.status_code} {response.text}"
+            }
+    except requests.RequestException as e:
+        return {
+            "success": False,
+            "error": f"Network error: {str(e)}"
+        }
+
+def parse_github_url(remote_url):
+    """Parse GitHub remote URL to extract owner and repo name"""
+    # Handle both HTTPS and SSH formats
+    patterns = [
+        r"https://github\.com/([^/]+)/([^/]+?)(?:\.git)?/?$",
+        r"git@github\.com:([^/]+)/([^/]+?)(?:\.git)?$"
+    ]
+    
+    for pattern in patterns:
+        match = re.match(pattern, remote_url.strip())
+        if match:
+            return match.group(1), match.group(2)
+    
+    return None, None
 
 @app.post("/v1/workspaces/{ws_id}/git/push")
 def git_push(ws_id: str, body: GitPushRequest):
@@ -501,7 +576,7 @@ def git_push(ws_id: str, body: GitPushRequest):
                 "stdout": push_result.stdout
             }
         
-        # Get remote URL to generate PR URL
+        # Get remote URL and create PR if requested
         remote_result = subprocess.run(
             ["git", "remote", "get-url", "origin"],
             cwd=base_real,
@@ -510,22 +585,60 @@ def git_push(ws_id: str, body: GitPushRequest):
         )
         
         pr_url = None
+        pr_number = None
+        pr_created = False
+        
         if remote_result.returncode == 0:
             remote_url = remote_result.stdout.strip()
-            if "github.com" in remote_url:
-                # Convert git URL to GitHub PR URL
-                if remote_url.endswith('.git'):
-                    remote_url = remote_url[:-4]
-                if remote_url.startswith('git@github.com:'):
-                    remote_url = remote_url.replace('git@github.com:', 'https://github.com/')
-                pr_url = f"{remote_url}/compare/{current_branch}...{new_branch}?expand=1"
+            repo_owner, repo_name = parse_github_url(remote_url)
+            
+            if repo_owner and repo_name and body.create_pr:
+                # Try to create PR using GitHub API
+                github_token = os.getenv("GITHUB_TOKEN")
+                if github_token:
+                    pr_title = body.pr_title or f"AI Agent Changes: {body.message}"
+                    pr_body_text = body.pr_body or f"""
+## AI Agent Generated Changes
+
+**Commit Message:** {body.message}
+
+**Branch:** `{new_branch}`
+
+This PR was automatically created by the AI Agent after making code changes.
+
+### Changes Made:
+- {body.message}
+
+Please review the changes and merge if appropriate.
+                    """.strip()
+                    
+                    pr_result = create_github_pr(
+                        repo_owner, repo_name, new_branch, current_branch,
+                        pr_title, pr_body_text, github_token
+                    )
+                    
+                    if pr_result["success"]:
+                        pr_url = pr_result["pr_url"]
+                        pr_number = pr_result["pr_number"]
+                        pr_created = True
+                        if pr_result.get("existing"):
+                            pr_created = "existing"
+                else:
+                    # No GitHub token, generate manual PR URL
+                    if remote_url.endswith('.git'):
+                        remote_url = remote_url[:-4]
+                    if remote_url.startswith('git@github.com:'):
+                        remote_url = remote_url.replace('git@github.com:', 'https://github.com/')
+                    pr_url = f"{remote_url}/compare/{current_branch}...{new_branch}?expand=1"
         
         return {
             "status": "pushed_to_branch",
             "branch": new_branch,
             "message": f"Successfully pushed changes to new branch '{new_branch}'",
             "pr_url": pr_url,
-            "pr_instructions": f"Create a PR from '{new_branch}' to '{current_branch}'" if not pr_url else None
+            "pr_number": pr_number,
+            "pr_created": pr_created,
+            "pr_instructions": "Click the PR URL to review and merge" if pr_url else f"Create a PR from '{new_branch}' to '{current_branch}'"
         }
         
     except subprocess.CalledProcessError as e:
