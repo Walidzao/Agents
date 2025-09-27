@@ -227,7 +227,7 @@ def git_status(ws_id: str):
             # Format: XY filename
             # X = index status, Y = working tree status
             status_code = line[:2]
-            filename = line[3:]
+            filename = line[3:].strip()  # Remove any trailing whitespace
             
             # Map git status codes to simple status
             if status_code == "??":

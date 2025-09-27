@@ -147,7 +147,20 @@ function updateFileStatusMarkers(fileStatuses) {
   // Add status markers to files
   Object.entries(fileStatuses).forEach(([path, status]) => {
     // Find the file element by data-path attribute
-    const fileEl = document.querySelector(`[data-path="${path}"]`);
+    let fileEl = document.querySelector(`[data-path="${path}"]`);
+    
+    // If not found, try to find by filename (fallback for path issues)
+    if (!fileEl) {
+      const filename = path.split('/').pop();
+      const allFiles = Array.from($$('.file'));
+      fileEl = allFiles.find(el => el.textContent.trim() === filename);
+      if (fileEl) {
+        console.log(`Found file by filename fallback: ${filename}`);
+        // Update the data-path to correct value
+        fileEl.dataset.path = path;
+      }
+    }
+    
     console.log(`Looking for file with path "${path}":`, fileEl);
     
     if (fileEl) {
@@ -161,11 +174,14 @@ function updateFileStatusMarkers(fileStatuses) {
         marker.className = 'file-status';
         marker.textContent = getStatusMarker(status);
         marker.title = `${status.charAt(0).toUpperCase() + status.slice(1)}: ${path}`;
+        marker.style.marginRight = '4px';
+        marker.style.fontWeight = 'bold';
         fileEl.insertBefore(marker, fileEl.firstChild);
         console.log(`Added ${status} marker to ${path}`);
       }
     } else {
-      console.warn(`Could not find file element for path: ${path}`);
+      console.warn(`Could not find file element for path: ${path}. Available files:`, 
+        Array.from($$('.file')).map(el => ({ path: el.dataset.path, text: el.textContent.trim() })));
     }
     
     // Mark parent directories as having changes
@@ -706,7 +722,7 @@ async function refreshTree() {
     state.treeData = data.entries || [];
     renderTree(state.treeData);
     
-    // Fetch git status after tree refresh
+    // Fetch git status after tree refresh and wait for it
     await fetchGitStatus();
   } catch (error) {
     $("tree").innerHTML = `<div class="error">Error loading tree: ${error.message}</div>`;
