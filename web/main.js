@@ -8,9 +8,17 @@ function base() {
 let editor;
 
 function initMonaco() {
+  const monacoEl = $("monaco");
+  const fallbackEl = $("fallback");
+  if (typeof require !== "function") {
+    // Monaco failed to load; stick with fallback
+    monacoEl.hidden = true;
+    fallbackEl.setAttribute("aria-hidden", "false");
+    return;
+  }
   if (editor) return;
   require(["vs/editor/editor.main"], function () {
-    editor = monaco.editor.create(document.getElementById("monaco"), {
+    editor = monaco.editor.create(monacoEl, {
       value: "",
       language: "plaintext",
       theme: "vs-dark",
@@ -19,6 +27,10 @@ function initMonaco() {
       minimap: { enabled: false },
       fontSize: 13,
     });
+    // Show Monaco, hide fallback
+    monacoEl.hidden = false;
+    fallbackEl.setAttribute("aria-hidden", "true");
+    fallbackEl.style.display = "none";
   });
 }
 
@@ -99,10 +111,14 @@ async function openFile(path) {
   try {
     const r = await fetch(`${base()}/v1/workspaces/${ws}/file?path=${encodeURIComponent(path)}`);
     const j = await r.json();
-    if (j && typeof j.content === 'string' && editor) {
-      const lang = guessLanguage(path);
-      monaco.editor.setModelLanguage(editor.getModel(), lang);
-      editor.setValue(j.content);
+    if (j && typeof j.content === 'string') {
+      if (editor) {
+        const lang = guessLanguage(path);
+        monaco.editor.setModelLanguage(editor.getModel(), lang);
+        editor.setValue(j.content);
+      } else {
+        renderCode(j.content);
+      }
       $("activePath").textContent = path;
     }
   } catch (e) {

@@ -46,7 +46,11 @@
           <div id="activePath" class="tab">No file</div>
         </div>
         <div id="viewer" class="viewer">
-          <div id="monaco" class="monaco"></div>
+          <div id="monaco" class="monaco" hidden></div>
+          <div id="fallback" class="fallback" aria-hidden="true">
+            <div id="gutter" class="gutter"></div>
+            <pre id="fileOut" class="code"></pre>
+          </div>
         </div>
       </section>
 
