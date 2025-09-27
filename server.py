@@ -1,13 +1,17 @@
 from fastapi import FastAPI, HTTPException, UploadFile, File, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, Dict, List
 import os
 import io
 import uuid
 import zipfile
 import subprocess
+import json
+import tempfile
+from datetime import datetime
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
@@ -193,3 +197,247 @@ def run(req: RunRequest):
         }
 
     raise HTTPException(408, "Max iterations reached without final answer")
+
+@app.get("/v1/workspaces/{ws_id}/git/status")
+def git_status(ws_id: str):
+    """Get git status for modified/added/deleted files"""
+    ws_root = os.path.join(WORKSPACES_BASE, ws_id)
+    base_real = os.path.realpath(ws_root)
+    if not os.path.isdir(base_real):
+        raise HTTPException(404, "Workspace not found")
+    
+    # Check if it's a git repo
+    if not os.path.isdir(os.path.join(base_real, ".git")):
+        return {"is_git": False, "files": {}}
+    
+    try:
+        # Get git status in porcelain format
+        result = subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=base_real,
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        
+        files = {}
+        for line in result.stdout.strip().split('\n'):
+            if not line:
+                continue
+            # Format: XY filename
+            # X = index status, Y = working tree status
+            status_code = line[:2]
+            filename = line[3:]
+            
+            # Map git status codes to simple status
+            if status_code == "??":
+                status = "untracked"
+            elif status_code.startswith("A"):
+                status = "added"
+            elif status_code.startswith("M") or " M" in status_code:
+                status = "modified"
+            elif status_code.startswith("D"):
+                status = "deleted"
+            elif status_code.startswith("R"):
+                status = "renamed"
+            else:
+                status = "unknown"
+            
+            files[filename] = status
+        
+        # Get current branch
+        branch_result = subprocess.run(
+            ["git", "branch", "--show-current"],
+            cwd=base_real,
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        
+        # Get remote URL
+        remote_result = subprocess.run(
+            ["git", "remote", "get-url", "origin"],
+            cwd=base_real,
+            capture_output=True,
+            text=True
+        )
+        
+        return {
+            "is_git": True,
+            "branch": branch_result.stdout.strip(),
+            "remote": remote_result.stdout.strip() if remote_result.returncode == 0 else None,
+            "files": files
+        }
+        
+    except subprocess.CalledProcessError as e:
+        raise HTTPException(500, f"Git command failed: {e.stderr}")
+
+@app.get("/v1/workspaces/{ws_id}/git/diff")
+def git_diff(ws_id: str, path: Optional[str] = None):
+    """Get git diff for a specific file or all files"""
+    ws_root = os.path.join(WORKSPACES_BASE, ws_id)
+    base_real = os.path.realpath(ws_root)
+    if not os.path.isdir(base_real):
+        raise HTTPException(404, "Workspace not found")
+    
+    if not os.path.isdir(os.path.join(base_real, ".git")):
+        raise HTTPException(400, "Not a git repository")
+    
+    try:
+        cmd = ["git", "diff", "--no-color"]
+        if path:
+            # Validate path
+            abs_path = os.path.realpath(os.path.join(base_real, path))
+            if not abs_path.startswith(base_real + os.sep):
+                raise HTTPException(400, "Invalid path")
+            cmd.append(path)
+        
+        result = subprocess.run(
+            cmd,
+            cwd=base_real,
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        
+        return {
+            "diff": result.stdout,
+            "path": path
+        }
+        
+    except subprocess.CalledProcessError as e:
+        raise HTTPException(500, f"Git diff failed: {e.stderr}")
+
+@app.post("/v1/workspaces/{ws_id}/download")
+def download_workspace(ws_id: str, format: str = Query("zip", regex="^(zip|diff)$")):
+    """Download workspace as ZIP or git diff"""
+    ws_root = os.path.join(WORKSPACES_BASE, ws_id)
+    base_real = os.path.realpath(ws_root)
+    if not os.path.isdir(base_real):
+        raise HTTPException(404, "Workspace not found")
+    
+    if format == "diff":
+        # Generate git diff
+        if not os.path.isdir(os.path.join(base_real, ".git")):
+            raise HTTPException(400, "Not a git repository")
+        
+        try:
+            result = subprocess.run(
+                ["git", "diff", "--no-color"],
+                cwd=base_real,
+                capture_output=True,
+                text=True,
+                check=True
+            )
+            
+            return StreamingResponse(
+                io.BytesIO(result.stdout.encode()),
+                media_type="text/plain",
+                headers={
+                    "Content-Disposition": f"attachment; filename=workspace_{ws_id}.diff"
+                }
+            )
+            
+        except subprocess.CalledProcessError as e:
+            raise HTTPException(500, f"Git diff failed: {e.stderr}")
+    
+    else:  # format == "zip"
+        # Create ZIP file
+        zip_buffer = io.BytesIO()
+        
+        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            for root, dirs, files in os.walk(base_real):
+                # Skip ignored directories
+                dirs[:] = [d for d in dirs if d not in IGNORE_DIRS]
+                
+                for file in files:
+                    file_path = os.path.join(root, file)
+                    arcname = os.path.relpath(file_path, base_real)
+                    zipf.write(file_path, arcname)
+        
+        zip_buffer.seek(0)
+        
+        return StreamingResponse(
+            zip_buffer,
+            media_type="application/zip",
+            headers={
+                "Content-Disposition": f"attachment; filename=workspace_{ws_id}.zip"
+            }
+        )
+
+class GitPushRequest(BaseModel):
+    message: str
+    branch: Optional[str] = None
+    create_pr: bool = False
+    pr_title: Optional[str] = None
+    pr_body: Optional[str] = None
+
+@app.post("/v1/workspaces/{ws_id}/git/push")
+def git_push(ws_id: str, body: GitPushRequest):
+    """Commit and push changes, optionally create PR"""
+    ws_root = os.path.join(WORKSPACES_BASE, ws_id)
+    base_real = os.path.realpath(ws_root)
+    if not os.path.isdir(base_real):
+        raise HTTPException(404, "Workspace not found")
+    
+    if not os.path.isdir(os.path.join(base_real, ".git")):
+        raise HTTPException(400, "Not a git repository")
+    
+    try:
+        # Add all changes
+        subprocess.run(["git", "add", "-A"], cwd=base_real, check=True)
+        
+        # Commit
+        commit_result = subprocess.run(
+            ["git", "commit", "-m", body.message],
+            cwd=base_real,
+            capture_output=True,
+            text=True
+        )
+        
+        if commit_result.returncode != 0:
+            if "nothing to commit" in commit_result.stdout:
+                return {"status": "no_changes", "message": "No changes to commit"}
+            raise HTTPException(500, f"Commit failed: {commit_result.stderr}")
+        
+        # Push to branch
+        branch = body.branch or "main"
+        push_result = subprocess.run(
+            ["git", "push", "origin", branch],
+            cwd=base_real,
+            capture_output=True,
+            text=True
+        )
+        
+        if push_result.returncode != 0:
+            # Try to push to a new branch if main is protected
+            if "protected branch" in push_result.stderr or "denied" in push_result.stderr:
+                branch = f"agent-changes-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+                subprocess.run(
+                    ["git", "checkout", "-b", branch],
+                    cwd=base_real,
+                    check=True
+                )
+                subprocess.run(
+                    ["git", "push", "origin", branch],
+                    cwd=base_real,
+                    check=True
+                )
+                
+                return {
+                    "status": "pushed_to_branch",
+                    "branch": branch,
+                    "message": "Pushed to new branch (main was protected)",
+                    "pr_url": None  # Could generate GitHub PR URL if we parse remote
+                }
+            else:
+                raise HTTPException(500, f"Push failed: {push_result.stderr}")
+        
+        return {
+            "status": "pushed",
+            "branch": branch,
+            "message": "Successfully pushed changes"
+        }
+        
+    except subprocess.CalledProcessError as e:
+        raise HTTPException(500, f"Git operation failed: {str(e)}")
