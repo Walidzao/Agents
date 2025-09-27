@@ -367,7 +367,16 @@ def download_workspace(ws_id: str, format: str = Query("zip", regex="^(zip|diff)
             raise HTTPException(400, "Not a git repository")
         
         try:
-            result = subprocess.run(
+            # Get both staged and unstaged changes
+            staged_result = subprocess.run(
+                ["git", "diff", "--no-color", "--cached"],
+                cwd=base_real,
+                capture_output=True,
+                text=True,
+                check=True
+            )
+            
+            unstaged_result = subprocess.run(
                 ["git", "diff", "--no-color"],
                 cwd=base_real,
                 capture_output=True,
@@ -375,8 +384,56 @@ def download_workspace(ws_id: str, format: str = Query("zip", regex="^(zip|diff)
                 check=True
             )
             
+            # Also get untracked files as diffs
+            untracked_result = subprocess.run(
+                ["git", "ls-files", "--others", "--exclude-standard"],
+                cwd=base_real,
+                capture_output=True,
+                text=True,
+                check=True
+            )
+            
+            # Combine all diffs
+            combined_diff = ""
+            
+            if staged_result.stdout.strip():
+                combined_diff += "# Staged Changes\n" + staged_result.stdout + "\n\n"
+            
+            if unstaged_result.stdout.strip():
+                combined_diff += "# Unstaged Changes\n" + unstaged_result.stdout + "\n\n"
+            
+            # Add untracked files as new file diffs
+            if untracked_result.stdout.strip():
+                combined_diff += "# Untracked Files\n"
+                for untracked_file in untracked_result.stdout.strip().split('\n'):
+                    if untracked_file.strip():
+                        try:
+                            file_path = os.path.join(base_real, untracked_file)
+                            with open(file_path, 'r', encoding='utf-8') as f:
+                                content = f.read()
+                            
+                            lines = content.split('\n')
+                            combined_diff += f"diff --git a/{untracked_file} b/{untracked_file}\n"
+                            combined_diff += "new file mode 100644\n"
+                            combined_diff += "index 0000000..0000000\n"
+                            combined_diff += "--- /dev/null\n"
+                            combined_diff += f"+++ b/{untracked_file}\n"
+                            combined_diff += f"@@ -0,0 +1,{len(lines)} @@\n"
+                            for line in lines:
+                                combined_diff += f"+{line}\n"
+                            combined_diff += "\n"
+                        except (UnicodeDecodeError, IOError):
+                            # Skip binary or unreadable files
+                            combined_diff += f"diff --git a/{untracked_file} b/{untracked_file}\n"
+                            combined_diff += "new file mode 100644\n"
+                            combined_diff += "Binary file (not shown)\n\n"
+            
+            # If no changes at all, provide a helpful message
+            if not combined_diff.strip():
+                combined_diff = "# No changes found\n# All files are up to date with the repository.\n"
+            
             return StreamingResponse(
-                io.BytesIO(result.stdout.encode()),
+                io.BytesIO(combined_diff.encode()),
                 media_type="text/plain",
                 headers={
                     "Content-Disposition": f"attachment; filename=workspace_{ws_id}.diff"
