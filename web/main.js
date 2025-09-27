@@ -450,21 +450,36 @@ async function commitAndPush() {
     });
     
     const data = await response.json();
+    console.log('Commit/push response:', data);
     
     hideCommitModal();
     
     if (data.status === 'no_changes') {
       showToast('No changes to commit', 'info');
-    } else if (data.status === 'pushed' || data.status === 'pushed_to_branch') {
-      showToast(`Successfully pushed to ${data.branch}`, 'success');
+    } else if (data.status === 'pushed_to_branch') {
+      showToast(`Successfully pushed to branch '${data.branch}'`, 'success');
       if (data.pr_url) {
-        showToast(`PR created: ${data.pr_url}`, 'success');
+        // Show PR URL as a clickable link
+        setTimeout(() => {
+          const prMessage = `PR ready: ${data.pr_url}`;
+          showToast(prMessage, 'success');
+          console.log('PR URL:', data.pr_url);
+        }, 1000);
+      } else if (data.pr_instructions) {
+        showToast(data.pr_instructions, 'info');
       }
       // Refresh git status
       await fetchGitStatus();
       await refreshTree();
+    } else if (data.status === 'commit_failed' || data.status === 'push_failed') {
+      showToast(`${data.message}`, 'error');
+      console.error('Git operation details:', data);
+    } else if (data.status === 'error') {
+      showToast(`Error: ${data.message}`, 'error');
+      console.error('Git error details:', data);
     }
   } catch (error) {
+    console.error('Commit/push error:', error);
     showToast(`Push failed: ${error.message}`, 'error');
   }
 }

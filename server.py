@@ -284,12 +284,46 @@ def git_diff(ws_id: str, path: Optional[str] = None):
         raise HTTPException(400, "Not a git repository")
     
     try:
-        cmd = ["git", "diff", "--no-color"]
         if path:
             # Validate path
             abs_path = os.path.realpath(os.path.join(base_real, path))
             if not abs_path.startswith(base_real + os.sep):
                 raise HTTPException(400, "Invalid path")
+            
+            # Check if file is untracked
+            status_result = subprocess.run(
+                ["git", "status", "--porcelain", path],
+                cwd=base_real,
+                capture_output=True,
+                text=True,
+                check=True
+            )
+            
+            if status_result.stdout.startswith("??"):
+                # Untracked file - show entire content as added
+                try:
+                    with open(abs_path, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                    lines = content.split('\n')
+                    diff_lines = [f"diff --git a/{path} b/{path}",
+                                "new file mode 100644",
+                                "index 0000000..0000000",
+                                "--- /dev/null",
+                                f"+++ b/{path}",
+                                "@@ -0,0 +1," + str(len(lines)) + " @@"]
+                    diff_lines.extend([f"+{line}" for line in lines])
+                    return {
+                        "diff": "\n".join(diff_lines),
+                        "path": path
+                    }
+                except UnicodeDecodeError:
+                    return {
+                        "diff": f"diff --git a/{path} b/{path}\nnew file mode 100644\nBinary file (not shown)",
+                        "path": path
+                    }
+        
+        cmd = ["git", "diff", "--no-color"]
+        if path:
             cmd.append(path)
         
         result = subprocess.run(
@@ -384,8 +418,26 @@ def git_push(ws_id: str, body: GitPushRequest):
         raise HTTPException(400, "Not a git repository")
     
     try:
+        # Configure git user (required for commits)
+        subprocess.run(["git", "config", "user.email", "agent@example.com"], cwd=base_real, check=True)
+        subprocess.run(["git", "config", "user.name", "AI Agent"], cwd=base_real, check=True)
+        
         # Add all changes
-        subprocess.run(["git", "add", "-A"], cwd=base_real, check=True)
+        add_result = subprocess.run(["git", "add", "-A"], cwd=base_real, capture_output=True, text=True)
+        if add_result.returncode != 0:
+            raise HTTPException(500, f"Git add failed: {add_result.stderr}")
+        
+        # Check if there are changes to commit
+        status_result = subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=base_real,
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        
+        if not status_result.stdout.strip():
+            return {"status": "no_changes", "message": "No changes to commit"}
         
         # Commit
         commit_result = subprocess.run(
@@ -396,48 +448,95 @@ def git_push(ws_id: str, body: GitPushRequest):
         )
         
         if commit_result.returncode != 0:
-            if "nothing to commit" in commit_result.stdout:
-                return {"status": "no_changes", "message": "No changes to commit"}
-            raise HTTPException(500, f"Commit failed: {commit_result.stderr}")
+            return {
+                "status": "commit_failed", 
+                "message": f"Commit failed: {commit_result.stderr}",
+                "stdout": commit_result.stdout
+            }
         
-        # Push to branch
-        branch = body.branch or "main"
+        # Get current branch
+        current_branch_result = subprocess.run(
+            ["git", "branch", "--show-current"],
+            cwd=base_real,
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        current_branch = current_branch_result.stdout.strip()
+        
+        # Always create a new branch for changes to avoid conflicts
+        new_branch = body.branch or f"agent-changes-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+        
+        # Create and switch to new branch
+        checkout_result = subprocess.run(
+            ["git", "checkout", "-b", new_branch],
+            cwd=base_real,
+            capture_output=True,
+            text=True
+        )
+        
+        if checkout_result.returncode != 0:
+            # If branch already exists, switch to it
+            subprocess.run(
+                ["git", "checkout", new_branch],
+                cwd=base_real,
+                capture_output=True,
+                text=True,
+                check=True
+            )
+        
+        # Push to new branch
         push_result = subprocess.run(
-            ["git", "push", "origin", branch],
+            ["git", "push", "origin", new_branch],
             cwd=base_real,
             capture_output=True,
             text=True
         )
         
         if push_result.returncode != 0:
-            # Try to push to a new branch if main is protected
-            if "protected branch" in push_result.stderr or "denied" in push_result.stderr:
-                branch = f"agent-changes-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
-                subprocess.run(
-                    ["git", "checkout", "-b", branch],
-                    cwd=base_real,
-                    check=True
-                )
-                subprocess.run(
-                    ["git", "push", "origin", branch],
-                    cwd=base_real,
-                    check=True
-                )
-                
-                return {
-                    "status": "pushed_to_branch",
-                    "branch": branch,
-                    "message": "Pushed to new branch (main was protected)",
-                    "pr_url": None  # Could generate GitHub PR URL if we parse remote
-                }
-            else:
-                raise HTTPException(500, f"Push failed: {push_result.stderr}")
+            return {
+                "status": "push_failed",
+                "message": f"Push failed: {push_result.stderr}",
+                "branch": new_branch,
+                "stdout": push_result.stdout
+            }
+        
+        # Get remote URL to generate PR URL
+        remote_result = subprocess.run(
+            ["git", "remote", "get-url", "origin"],
+            cwd=base_real,
+            capture_output=True,
+            text=True
+        )
+        
+        pr_url = None
+        if remote_result.returncode == 0:
+            remote_url = remote_result.stdout.strip()
+            if "github.com" in remote_url:
+                # Convert git URL to GitHub PR URL
+                if remote_url.endswith('.git'):
+                    remote_url = remote_url[:-4]
+                if remote_url.startswith('git@github.com:'):
+                    remote_url = remote_url.replace('git@github.com:', 'https://github.com/')
+                pr_url = f"{remote_url}/compare/{current_branch}...{new_branch}?expand=1"
         
         return {
-            "status": "pushed",
-            "branch": branch,
-            "message": "Successfully pushed changes"
+            "status": "pushed_to_branch",
+            "branch": new_branch,
+            "message": f"Successfully pushed changes to new branch '{new_branch}'",
+            "pr_url": pr_url,
+            "pr_instructions": f"Create a PR from '{new_branch}' to '{current_branch}'" if not pr_url else None
         }
         
     except subprocess.CalledProcessError as e:
-        raise HTTPException(500, f"Git operation failed: {str(e)}")
+        return {
+            "status": "error",
+            "message": f"Git operation failed: {str(e)}",
+            "stderr": getattr(e, 'stderr', ''),
+            "stdout": getattr(e, 'stdout', '')
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": f"Unexpected error: {str(e)}"
+        }
