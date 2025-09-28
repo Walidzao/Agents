@@ -14,7 +14,8 @@ const state = {
   editor: null,
   gitStatus: null,
   viewMode: 'code', // 'code' or 'diff'
-  currentDiff: null
+  currentDiff: null,
+  isWelcomeScreen: true
 };
 
 // Configuration
@@ -80,6 +81,54 @@ function debounce(func, delay) {
     clearTimeout(timeoutId);
     timeoutId = setTimeout(() => func.apply(this, args), delay);
   };
+}
+
+// UI Screen Management
+function showWelcomeScreen() {
+  state.isWelcomeScreen = true;
+  $('welcomeScreen').classList.remove('hidden');
+  $('mainApp').classList.add('hidden');
+}
+
+function showMainApp() {
+  state.isWelcomeScreen = false;
+  $('welcomeScreen').classList.add('hidden');
+  $('mainApp').classList.remove('hidden');
+  
+  // Update workspace info in header
+  if (state.workspace) {
+    $('workspaceInfo').textContent = `Workspace: ${state.workspace}`;
+  }
+}
+
+// Dropdown functionality
+function toggleDropdown(dropdownId) {
+  const dropdown = $(dropdownId);
+  const isVisible = !dropdown.classList.contains('hidden');
+  
+  // Hide all dropdowns first
+  $$('.dropdown-menu').forEach(menu => menu.classList.add('hidden'));
+  
+  // Toggle the requested dropdown
+  if (!isVisible) {
+    dropdown.classList.remove('hidden');
+  }
+}
+
+function hideAllDropdowns() {
+  $$('.dropdown-menu').forEach(menu => menu.classList.add('hidden'));
+}
+
+// Enhanced workspace loading
+async function loadWorkspace(workspaceId) {
+  if (!workspaceId) return;
+  
+  state.workspace = workspaceId;
+  localStorage.setItem('workspace', workspaceId);
+  
+  showMainApp();
+  await refreshTree();
+  showToast('Workspace loaded successfully', 'success');
 }
 
 // Git operations
@@ -1046,6 +1095,16 @@ function removeStreamingBubble() {
   }
 }
 
+// Add function to get limited chat context
+function getChatContext(limit = 10) {
+  // Get recent chat history, excluding the current prompt that will be added
+  const recentHistory = state.chatHistory.slice(-limit);
+  return recentHistory.map(msg => ({
+    role: msg.role === 'user' ? 'user' : 'assistant', 
+    text: msg.text
+  }));
+}
+
 async function sendPrompt() {
   const prompt = $("prompt").value.trim();
   if (!state.workspace || !prompt || state.isStreaming) return;
@@ -1058,10 +1117,17 @@ async function sendPrompt() {
   const streamingBubble = addStreamingBubble();
   
   try {
+    // Include recent chat history in the request
+    const chatContext = getChatContext(10); // Last 10 messages
+    
     const response = await apiCall("/v1/run", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ prompt, workspace: state.workspace })
+      body: JSON.stringify({ 
+        prompt, 
+        workspace: state.workspace,
+        chatHistory: chatContext
+      })
     });
     
     const data = await response.json();
@@ -1112,10 +1178,8 @@ async function uploadWorkspace() {
     
     const data = await response.json();
     if (data.workspace_id) {
-      state.workspace = data.workspace_id;
-      $("ws").value = data.workspace_id;
+      await loadWorkspace(data.workspace_id);
       showToast("Workspace uploaded successfully", "success");
-      await refreshTree();
     }
   } catch (error) {
     showToast(`Upload failed: ${error.message}`, "error");
@@ -1140,10 +1204,8 @@ async function cloneRepository() {
     
     const data = await response.json();
     if (data.workspace_id) {
-      state.workspace = data.workspace_id;
-      $("ws").value = data.workspace_id;
+      await loadWorkspace(data.workspace_id);
       showToast("Repository cloned successfully", "success");
-      await refreshTree();
     }
   } catch (error) {
     showToast(`Clone failed: ${error.message}`, "error");
@@ -1183,24 +1245,65 @@ document.addEventListener("DOMContentLoaded", () => {
   if (savedWorkspace) {
     $("ws").value = savedWorkspace;
     state.workspace = savedWorkspace;
-    refreshTree();
+    loadWorkspace(savedWorkspace);
+  } else {
+    // Show welcome screen if no saved workspace
+    showWelcomeScreen();
   }
   
   // Health check
   $("healthBtn").addEventListener('click', checkHealth);
   
-  // Workspace operations
+  // Workspace operations (welcome screen)
   $("uploadBtn").addEventListener('click', uploadWorkspace);
   $("cloneBtn").addEventListener('click', cloneRepository);
+  $("loadWorkspaceBtn").addEventListener('click', () => {
+    const workspaceId = $("ws").value.trim();
+    if (workspaceId) {
+      loadWorkspace(workspaceId);
+    } else {
+      showToast("Please enter a workspace ID", "warning");
+    }
+  });
+  
+  // Main app workspace operations
   $("treeBtn").addEventListener('click', refreshTree);
+  $("uploadNewBtn").addEventListener('click', () => {
+    showWelcomeScreen();
+    // Clear previous selections
+    $("zipFile").value = '';
+    $("repoUrl").value = '';
+    $("branch").value = 'main';
+    $("ws").value = '';
+  });
+  $("cloneNewBtn").addEventListener('click', () => {
+    showWelcomeScreen();
+    // Clear previous selections
+    $("zipFile").value = '';
+    $("repoUrl").value = '';
+    $("branch").value = 'main';
+    $("ws").value = '';
+  });
+  
+  // Dropdown functionality
+  $("downloadDropdownBtn").addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleDropdown('downloadDropdown');
+  });
   
   // Tree tab switching
   $("filesTab").addEventListener('click', () => switchTreeTab('files'));
   $("changesTab").addEventListener('click', () => switchTreeTab('changes'));
   
-  // Download buttons
-  $("downloadZipBtn").addEventListener('click', () => downloadWorkspace('zip'));
-  $("downloadDiffBtn").addEventListener('click', () => downloadWorkspace('diff'));
+  // Download buttons (in dropdown)
+  $("downloadZipBtn").addEventListener('click', () => {
+    downloadWorkspace('zip');
+    hideAllDropdowns();
+  });
+  $("downloadDiffBtn").addEventListener('click', () => {
+    downloadWorkspace('diff');
+    hideAllDropdowns();
+  });
   
   // Git operations
   $("commitBtn").addEventListener('click', showCommitModal);
@@ -1211,19 +1314,13 @@ document.addEventListener("DOMContentLoaded", () => {
   $("viewCodeBtn").addEventListener('click', () => setViewMode('code'));
   $("viewDiffBtn").addEventListener('click', () => setViewMode('diff'));
   
-  // Workspace input
-  $("ws").addEventListener('change', (e) => {
-    state.workspace = e.target.value.trim();
-    localStorage.setItem('workspace', state.workspace);
-    if (state.workspace) refreshTree();
-  });
-  
-  $("ws").addEventListener('blur', (e) => {
-    const newValue = e.target.value.trim();
-    if (newValue !== state.workspace) {
-      state.workspace = newValue;
-      localStorage.setItem('workspace', state.workspace);
-      if (state.workspace) refreshTree();
+  // Workspace input (for welcome screen load existing)
+  $("ws").addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      const workspaceId = e.target.value.trim();
+      if (workspaceId) {
+        loadWorkspace(workspaceId);
+      }
     }
   });
   
@@ -1248,6 +1345,14 @@ document.addEventListener("DOMContentLoaded", () => {
     if (e.key === 'Escape' && !$('commitModal').classList.contains('hidden')) {
       hideCommitModal();
     }
+    if (e.key === 'Escape') {
+      hideAllDropdowns();
+    }
+  });
+  
+  // Click outside to close dropdowns
+  document.addEventListener('click', () => {
+    hideAllDropdowns();
   });
   
   // Global keyboard shortcuts

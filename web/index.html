@@ -3,117 +3,173 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Agentic Code Assistant</title>
+  <title>Zillo</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
   <div class="root">
-    <header>
-      <div class="left">
-        <strong>Agentic Code Assistant</strong>
+    <!-- Initial Welcome Screen -->
+    <div id="welcomeScreen" class="welcome-screen">
+      <div class="welcome-container">
+        <div class="welcome-header">
+          <h1>Zillo</h1>
+          <p>AI-powered code assistant</p>
+        </div>
+        
+        <div class="welcome-content">
+          <div class="setup-section">
+            <h2>Get Started</h2>
+            <p>Upload a project or clone a repository to begin</p>
+            
+            <div class="setup-options">
+              <!-- Upload ZIP -->
+              <div class="setup-card">
+                <div class="setup-icon">📁</div>
+                <h3>Upload Project</h3>
+                <p>Upload a ZIP file containing your project</p>
+                <div class="upload-area">
+                  <input id="zipFile" type="file" accept=".zip" aria-label="Upload ZIP file" />
+                  <button id="uploadBtn" class="primary">Upload ZIP</button>
+                </div>
+              </div>
+              
+              <!-- Clone Repository -->
+              <div class="setup-card">
+                <div class="setup-icon">🔗</div>
+                <h3>Clone Repository</h3>
+                <p>Clone a Git repository from URL</p>
+                <div class="clone-form">
+                  <input id="repoUrl" type="text" placeholder="https://github.com/user/repo.git" aria-label="Repository URL" />
+                  <div class="branch-input">
+                    <input id="branch" type="text" value="main" placeholder="branch" aria-label="Branch" />
+                    <button id="cloneBtn" class="primary">Clone</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Existing Workspace -->
+            <div class="existing-workspace">
+              <h3>Continue with existing workspace</h3>
+              <div class="workspace-input">
+                <input id="ws" type="text" placeholder="Enter workspace ID" aria-label="Workspace ID" />
+                <button id="loadWorkspaceBtn">Load</button>
+              </div>
+            </div>
+          </div>
+          
+          <div class="server-config">
+            <h3>Server Configuration</h3>
+            <div class="server-input">
+              <input id="baseUrl" type="text" value="https://agents-assistant-qwcl.onrender.com" />
+              <button id="healthBtn">Check</button>
+              <span id="healthBadge"></span>
+            </div>
+          </div>
+        </div>
       </div>
-      <div class="right">
-        <input id="baseUrl" type="text" value="https://agents-assistant-qwcl.onrender.com" />
-        <button id="healthBtn">Check</button>
-        <span id="healthBadge"></span>
-      </div>
-    </header>
+    </div>
 
-    <main class="layout">
-      <!-- Explorer Panel -->
-      <aside class="explorer" role="navigation" aria-label="File Explorer">
-        <div class="explorer-header">
-          <div class="row">
-            <input id="ws" type="text" placeholder="workspace_id" aria-label="Workspace ID" />
-          </div>
-          <div class="row">
-            <input id="repoUrl" type="text" placeholder="https://github.com/user/repo.git" aria-label="Repository URL" />
-            <input id="branch" type="text" value="main" placeholder="branch" aria-label="Branch" style="width: 80px;" />
-          </div>
-          <div class="row">
-            <input id="zipFile" type="file" accept=".zip" aria-label="Upload ZIP file" />
-          </div>
-          <div class="row">
-            <button id="uploadBtn">Upload</button>
-            <button id="cloneBtn">Clone</button>
-            <button id="treeBtn" aria-label="Refresh file tree">Refresh</button>
-          </div>
-          <div class="download-buttons">
-            <button id="downloadZipBtn" title="Download workspace as ZIP">
-              <span>⬇</span> ZIP
-            </button>
-            <button id="downloadDiffBtn" title="Download changes as diff" class="hidden">
-              <span>⬇</span> Diff
-            </button>
+    <!-- Main Application (hidden initially) -->
+    <div id="mainApp" class="main-app hidden">
+      <header class="app-header">
+        <div class="left">
+          <strong>Zillo</strong>
+        </div>
+        <div class="center">
+          <div class="workspace-actions">
+            <button id="treeBtn" aria-label="Refresh file tree" title="Refresh">🔄</button>
+            <div class="dropdown">
+              <button id="downloadDropdownBtn" class="dropdown-toggle" title="Download">⬇ Download</button>
+              <div id="downloadDropdown" class="dropdown-menu hidden">
+                <button id="downloadZipBtn" class="dropdown-item">
+                  <span>📦</span> ZIP Archive
+                </button>
+                <button id="downloadDiffBtn" class="dropdown-item hidden">
+                  <span>📄</span> Diff File
+                </button>
+              </div>
+            </div>
+            <button id="uploadNewBtn" title="Upload new project">📁 Upload</button>
+            <button id="cloneNewBtn" title="Clone new repository">🔗 Clone</button>
           </div>
         </div>
-        <div id="gitToolbar" class="git-toolbar hidden">
-          <div class="status">
-            <span>Branch:</span>
-            <span class="branch" id="gitBranch">main</span>
-          </div>
-          <div class="actions">
-            <button id="commitBtn">Commit & Push</button>
-          </div>
+        <div class="right">
+          <span id="workspaceInfo" class="workspace-info"></span>
         </div>
-        <div id="treeLoading" class="tree-loading hidden">
-          <div class="skeleton" style="height: 20px; margin: 8px;"></div>
-          <div class="skeleton" style="height: 20px; margin: 8px;"></div>
-          <div class="skeleton" style="height: 20px; margin: 8px;"></div>
-        </div>
-        <div class="tree-tabs">
-          <button id="filesTab" class="tree-tab active">Files</button>
-          <button id="changesTab" class="tree-tab hidden">Changes</button>
-        </div>
-        <div id="tree" class="tree" role="tree" aria-label="File tree"></div>
-        <div id="changesTree" class="tree hidden" role="tree" aria-label="Changed files"></div>
-      </aside>
+      </header>
 
-      <!-- Editor Panel -->
-      <section class="editor" role="main">
-        <div class="breadcrumbs" id="breadcrumbs" aria-label="File path">
-          <span>No file selected</span>
-        </div>
-        <div class="editor-toolbar hidden" id="editorToolbar">
-          <div class="toggle">
-            <button id="viewCodeBtn" class="active">Code</button>
-            <button id="viewDiffBtn">Diff</button>
+      <main class="layout">
+        <!-- Explorer Panel -->
+        <aside class="explorer" role="navigation" aria-label="File Explorer">
+          <div id="gitToolbar" class="git-toolbar hidden">
+            <div class="status">
+              <span>Branch:</span>
+              <span class="branch" id="gitBranch">main</span>
+            </div>
+            <div class="actions">
+              <button id="commitBtn">Commit & Push</button>
+            </div>
           </div>
-        </div>
-        <div class="tabs">
-          <div id="activePath" class="tab">No file</div>
-        </div>
-        <div id="viewerLoading" class="viewer-loading hidden">
-          <div style="padding: 20px;">
-            <div class="skeleton" style="height: 16px; margin-bottom: 8px;"></div>
-            <div class="skeleton" style="height: 16px; width: 80%; margin-bottom: 8px;"></div>
-            <div class="skeleton" style="height: 16px; width: 60%;"></div>
+          <div id="treeLoading" class="tree-loading hidden">
+            <div class="skeleton" style="height: 20px; margin: 8px;"></div>
+            <div class="skeleton" style="height: 20px; margin: 8px;"></div>
+            <div class="skeleton" style="height: 20px; margin: 8px;"></div>
           </div>
-        </div>
-        <div id="viewer" class="viewer">
-          <div id="monaco" class="monaco" hidden></div>
-          <div id="fallback" class="fallback">
-            <div id="gutter" class="gutter"></div>
-            <pre id="fileOut" class="code"></pre>
+          <div class="tree-tabs">
+            <button id="filesTab" class="tree-tab active">Files</button>
+            <button id="changesTab" class="tree-tab hidden">Changes</button>
           </div>
-          <div id="diffViewer" class="diff-viewer hidden"></div>
-        </div>
-      </section>
+          <div id="tree" class="tree" role="tree" aria-label="File tree"></div>
+          <div id="changesTree" class="tree hidden" role="tree" aria-label="Changed files"></div>
+        </aside>
 
-      <!-- Chat Panel -->
-      <section class="chat" role="complementary" aria-label="Chat with assistant">
-        <div class="chat-messages" id="chatMessages" role="log" aria-live="polite"></div>
-        <div class="chat-input">
-          <textarea 
-            id="prompt" 
-            placeholder="Ask the assistant to help with your code..."
-            aria-label="Chat prompt"
-          ></textarea>
-          <button id="runBtn" aria-label="Send message">Send</button>
-        </div>
-        <pre id="runOut" class="scroll hidden"></pre>
-      </section>
-    </main>
+        <!-- Editor Panel -->
+        <section class="editor" role="main">
+          <div class="breadcrumbs" id="breadcrumbs" aria-label="File path">
+            <span>No file selected</span>
+          </div>
+          <div class="editor-toolbar hidden" id="editorToolbar">
+            <div class="toggle">
+              <button id="viewCodeBtn" class="active">Code</button>
+              <button id="viewDiffBtn">Diff</button>
+            </div>
+          </div>
+          <div class="tabs">
+            <div id="activePath" class="tab">No file</div>
+          </div>
+          <div id="viewerLoading" class="viewer-loading hidden">
+            <div style="padding: 20px;">
+              <div class="skeleton" style="height: 16px; margin-bottom: 8px;"></div>
+              <div class="skeleton" style="height: 16px; width: 80%; margin-bottom: 8px;"></div>
+              <div class="skeleton" style="height: 16px; width: 60%;"></div>
+            </div>
+          </div>
+          <div id="viewer" class="viewer">
+            <div id="monaco" class="monaco" hidden></div>
+            <div id="fallback" class="fallback">
+              <div id="gutter" class="gutter"></div>
+              <pre id="fileOut" class="code"></pre>
+            </div>
+            <div id="diffViewer" class="diff-viewer hidden"></div>
+          </div>
+        </section>
+
+        <!-- Chat Panel -->
+        <section class="chat" role="complementary" aria-label="Chat with assistant">
+          <div class="chat-messages" id="chatMessages" role="log" aria-live="polite"></div>
+          <div class="chat-input">
+            <textarea 
+              id="prompt" 
+              placeholder="Ask the assistant to help with your code..."
+              aria-label="Chat prompt"
+            ></textarea>
+            <button id="runBtn" aria-label="Send message">Send</button>
+          </div>
+          <pre id="runOut" class="scroll hidden"></pre>
+        </section>
+      </main>
+    </div>
   </div>
 
   <!-- Toast notifications -->

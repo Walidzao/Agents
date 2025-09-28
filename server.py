@@ -27,11 +27,16 @@ os.makedirs(WORKSPACES_BASE, exist_ok=True)
 IGNORE_DIRS = {".git", "node_modules", ".venv", "__pycache__"}
 MAX_ENTRIES = 2000
 
+class ChatMessage(BaseModel):
+    role: str  # 'user' or 'assistant'
+    text: str
+
 class RunRequest(BaseModel):
     prompt: str
     workspace: Optional[str] = None
     verbose: bool = False
     max_iterations: Optional[int] = None
+    chatHistory: Optional[List[ChatMessage]] = []
 
 class CloneRequest(BaseModel):
     repo_url: str
@@ -166,7 +171,20 @@ def run(req: RunRequest):
         tools=[available_functions],
         candidate_count=1,
     )
-    messages = [types.Content(role="user", parts=[types.Part(text=req.prompt)])]
+    
+    # Build messages with chat history context
+    messages = []
+    
+    # Add recent chat history if provided (limit to last 10 messages to control context size)
+    if req.chatHistory:
+        limited_history = req.chatHistory[-10:]  # Last 10 messages max
+        for msg in limited_history:
+            role = "user" if msg.role == "user" else "model"  # Gemini uses "model" instead of "assistant"
+            messages.append(types.Content(role=role, parts=[types.Part(text=msg.text)]))
+    
+    # Add the current prompt
+    messages.append(types.Content(role="user", parts=[types.Part(text=req.prompt)]))
+    
     iters = req.max_iterations or cfg.max_iterations
 
     for _ in range(iters):
@@ -198,7 +216,7 @@ def run(req: RunRequest):
             },
         }
 
-    raise HTTPException(408, "Max iterations reached without final answer")
+    raise HTTPException(500, "Max iterations reached")
 
 @app.get("/v1/workspaces/{ws_id}/git/status")
 def git_status(ws_id: str):
