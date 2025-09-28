@@ -1,6 +1,7 @@
 from functions.get_files_info import get_files_info
 from functions.get_file_content import get_file_content
 from functions.write_file_content import write_file_content
+from functions.edit_file_content import edit_file_content
 from functions.run_python_file import run_python_file
 from google.genai import types
 from config import WORKING_DIRECTORY, LOCAL_MODE
@@ -8,6 +9,7 @@ from config import WORKING_DIRECTORY, LOCAL_MODE
 from functions.get_files_info import schema_get_files_info
 from functions.get_file_content import schema_get_file_content
 from functions.write_file_content import schema_write_file_content
+from functions.edit_file_content import schema_edit_file_content
 from functions.run_python_file import schema_run_python_file
 
 available_functions = types.Tool(
@@ -15,6 +17,7 @@ available_functions = types.Tool(
     schema_get_files_info,
     schema_get_file_content,
     schema_write_file_content,
+    schema_edit_file_content,
     schema_run_python_file,
     ]
 )
@@ -38,6 +41,7 @@ def call_function(function_call_part, verbose=False,workspace_root="" ):
         "get_file_content": get_file_content,
         "run_python_file": run_python_file,
         "write_file_content": write_file_content,
+        "edit_file_content": edit_file_content,
     }
     if function_name not in function_map:
         return types.Content(

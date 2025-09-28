@@ -9,6 +9,10 @@ def write_file_content(working_directory, file_path, content):
     if content is None:
         return "Error: content is required"
     
+    # Check file size limits to prevent truncation issues
+    if len(content) > 50000:  # 50KB limit
+        return f'Error: Content too large ({len(content)} chars). Use edit_file_content for large files or break into smaller parts.'
+    
     abs_working_dir = os.path.realpath(working_directory)
     abs_file_path = os.path.realpath(os.path.join(abs_working_dir, file_path))
     

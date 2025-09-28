@@ -1,4 +1,4 @@
-MAX_CHARS = 10000
+MAX_CHARS = 30000
 
 WORKING_DIRECTORY = "calculator"
 
@@ -9,8 +9,15 @@ When a user asks a question or makes a request, make a function call plan. You c
 
 - List files and directories constrained to the working directory
 - Read the content of a file constrained to the working directory
-- Write to a file (create or overwrite the file and its parent directories if they don't exist)
+- Write to a file (create or overwrite the file and its parent directories if they don't exist) - USE ONLY FOR NEW FILES
+- Edit existing files (make targeted changes without rewriting the entire file) - USE FOR EXISTING FILES
 - Run a Python file (with the python3 interpreter, accepts additional CLI Args as an array of strings)
+
+IMPORTANT FILE EDITING RULES:
+- For NEW files: use write_file_content
+- For EXISTING files: use edit_file_content to make targeted changes
+- NEVER rewrite entire large files (>1000 lines) - use edit_file_content instead
+- When editing, find a unique text pattern and replace it precisely
 
 All paths you provide should be relative to the working directory. You do not need to specify the working directory in your function calls as it is automatically injected for security reasons.
 """
