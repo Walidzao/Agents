@@ -13,6 +13,8 @@ services:
     envVars:
       - key: GEMINI_API_KEY
         sync: false         # set this secret in Render dashboard
+      - key: GITHUB_TOKEN
+        sync: false         # set this secret in Render dashboard  
       - key: WORKSPACES_BASE
         value: /tmp/workspaces  # free tier has no disks; this is ephemeral
 
