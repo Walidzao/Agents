@@ -105,7 +105,8 @@ body {
 
 .welcome-content {
   display: grid;
-  grid-template-columns: 2fr 1fr;
+  grid-template-columns: 1fr; /* center the setup */
+  justify-items: center;
   gap: var(--space-xl);
   align-items: start;
 }
@@ -121,6 +122,12 @@ body {
   margin: 0 0 var(--space-xl) 0;
 }
 
+.setup-section {
+  width: 100%;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
 .setup-options {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -134,12 +141,13 @@ body {
   border-radius: 12px;
   padding: var(--space-xl);
   text-align: center;
-  transition: all 0.3s ease;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
 }
 
 .setup-card:hover {
   border-color: var(--text-accent);
-  box-shadow: 0 4px 16px rgba(94, 158, 255, 0.1);
+  box-shadow: 0 6px 18px rgba(94, 158, 255, 0.12);
+  transform: translateY(-2px);
 }
 
 .setup-icon {
@@ -195,6 +203,13 @@ body {
   flex: 1;
 }
 
+.setup-bottom {
+  display: grid;
+  grid-template-columns: 1fr 1fr; /* existing workspace | server config */
+  gap: var(--space-xl);
+  align-items: stretch;
+}
+
 .server-config {
   background: var(--bg-secondary);
   border: 1px solid var(--border-primary);
@@ -224,6 +239,36 @@ body {
   padding: 2px 8px;
   border-radius: 12px;
   background: var(--bg-tertiary);
+}
+
+/* Aesthetic file input */
+.file-input {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-primary);
+  border-radius: 8px;
+  padding: var(--space-sm) var(--space-md);
+  position: relative;
+  overflow: hidden;
+}
+.file-input input[type="file"] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.file-input .file-label {
+  background: var(--button-primary);
+  color: #fff;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+}
+.file-input .file-name {
+  color: var(--text-secondary);
+  font-size: 12px;
 }
 
 /* Main App */

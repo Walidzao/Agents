@@ -1245,6 +1245,15 @@ document.addEventListener("DOMContentLoaded", () => {
   const savedWorkspace = localStorage.getItem('workspace');
   
   if (savedUrl) $("baseUrl").value = savedUrl;
+  // Update custom file input label
+  const zipEl = $("zipFile");
+  if (zipEl) {
+    zipEl.addEventListener('change', (e) => {
+      const f = e.target.files && e.target.files[0];
+      const nameEl = $("zipName");
+      if (nameEl) nameEl.textContent = f ? f.name : "No file chosen";
+    });
+  }
   if (savedWorkspace) {
     $("ws").value = savedWorkspace;
     state.workspace = savedWorkspace;
