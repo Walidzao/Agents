@@ -1,3 +1,40 @@
+async function ragIndex() {
+    const indexPaths = document.getElementById('indexPaths').value;
+    if (!state.workspace) {
+        showToast("No workspace loaded.");
+        return;
+    }
+    const url = `/v1/workspaces/${state.workspace}/rag/index`;
+    const data = { paths: indexPaths.split('\n') }; // Assuming newline separated paths
+    const result = await apiCall(url, 'POST', data, '#runOut');
+    console.log("Index result", result)
+}
+
+async function ragQuery() {
+    const queryInput = document.getElementById('queryInput').value;
+    if (!state.workspace) {
+        showToast("No workspace loaded.");
+        return;
+    }
+    const url = `/v1/workspaces/${state.workspace}/rag/query`;
+    const data = { query: queryInput };
+    const result = await apiCall(url, 'POST', data, '#runOut');
+    console.log("Query result", result)
+}
+
+
+// Modify initWorkspace to enable/disable RAG buttons
+function initWorkspace(workspace) {
+    state.workspace = workspace;
+    localStorage.setItem('workspace', workspace);
+    showMainApp();
+    refreshTree();
+
+    // Enable RAG buttons
+    document.getElementById('indexButton').disabled = !workspace;
+    document.getElementById('queryButton').disabled = !workspace;
+}
+
 // Utility functions
 const $ = (id) => document.getElementById(id);
 const $$ = (selector) => document.querySelectorAll(selector);
@@ -50,7 +87,50 @@ function base() {
   return $("baseUrl").value.replace(/\/$/, "");
 }
 
-async function apiCall(endpoint, options = {}) {
+async function apiCall(url, method, data, outputElement) {
+  try {
+    const response = await fetch(url, {
+      method: method,
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(data)
+        document.getElementById('indexButton').addEventListener('click', ragIndex);
+    document.getElementById('queryButton').addEventListener('click', ragQuery);
+
+    // Initially disable RAG buttons
+    document.getElementById('indexButton').disabled = true;
+    document.getElementById('queryButton').disabled = true;
+});
+
+    if (!response.ok) {
+      const error = await response.json();
+      showToast(`API Error: ${response.status} - ${error.message}`);
+      console.error('API Error:', error);
+      if (outputElement) {
+          document.querySelector(outputElement).textContent = `API Error: ${response.status} - ${error.message}`; // Display error in output element as well
+      }
+      return;
+    }
+
+
+    const result = await response.json();
+    console.log('API Result:', result);
+
+    if (outputElement) {
+      document.querySelector(outputElement).textContent = JSON.stringify(result, null, 2);
+    }
+    showToast("Success!");
+
+
+  } catch (error) {
+    showToast(`Fetch Error: ${error}`);
+    console.error('Fetch Error:', error);
+    if (outputElement) {
+         document.querySelector(outputElement).textContent = `Fetch Error: ${error}`; // Display error in output element as well
+    }
+  }
+}
   try {
     const response = await fetch(`${base()}${endpoint}`, options);
     if (!response.ok) {
@@ -180,7 +260,13 @@ function updateFileStatusMarkers(fileStatuses) {
   $$('.file-status, .dir-status').forEach(el => el.remove());
   $$('.file, .dir').forEach(el => {
     el.classList.remove('modified', 'added', 'deleted', 'untracked');
-  });
+      document.getElementById('indexButton').addEventListener('click', ragIndex);
+    document.getElementById('queryButton').addEventListener('click', ragQuery);
+
+    // Initially disable RAG buttons
+    document.getElementById('indexButton').disabled = true;
+    document.getElementById('queryButton').disabled = true;
+});
   
   if (!fileStatuses || Object.keys(fileStatuses).length === 0) {
     // Hide changes tab if no changes
@@ -241,7 +327,13 @@ function updateFileStatusMarkers(fileStatuses) {
       const dirEls = Array.from($$('.dir')).filter(el => {
         const span = el.querySelector('span');
         return span && span.textContent.includes(dirName);
-      });
+          document.getElementById('indexButton').addEventListener('click', ragIndex);
+    document.getElementById('queryButton').addEventListener('click', ragQuery);
+
+    // Initially disable RAG buttons
+    document.getElementById('indexButton').disabled = true;
+    document.getElementById('queryButton').disabled = true;
+});
       
       dirEls.forEach(dirEl => {
         if (!dirEl.classList.contains('has-changes')) {
@@ -255,9 +347,21 @@ function updateFileStatusMarkers(fileStatuses) {
             dirEl.insertBefore(marker, dirEl.firstChild);
           }
         }
-      });
+          document.getElementById('indexButton').addEventListener('click', ragIndex);
+    document.getElementById('queryButton').addEventListener('click', ragQuery);
+
+    // Initially disable RAG buttons
+    document.getElementById('indexButton').disabled = true;
+    document.getElementById('queryButton').disabled = true;
+});
     }
-  });
+      document.getElementById('indexButton').addEventListener('click', ragIndex);
+    document.getElementById('queryButton').addEventListener('click', ragQuery);
+
+    // Initially disable RAG buttons
+    document.getElementById('indexButton').disabled = true;
+    document.getElementById('queryButton').disabled = true;
+});
   
   // Render changes tree
   renderChangesTree(fileStatuses);
@@ -324,10 +428,22 @@ function renderChangesTree(fileStatuses) {
         e.preventDefault();
         openFile(path);
       }
-    });
+        document.getElementById('indexButton').addEventListener('click', ragIndex);
+    document.getElementById('queryButton').addEventListener('click', ragQuery);
+
+    // Initially disable RAG buttons
+    document.getElementById('indexButton').disabled = true;
+    document.getElementById('queryButton').disabled = true;
+});
     
     ul.appendChild(li);
-  });
+      document.getElementById('indexButton').addEventListener('click', ragIndex);
+    document.getElementById('queryButton').addEventListener('click', ragQuery);
+
+    // Initially disable RAG buttons
+    document.getElementById('indexButton').disabled = true;
+    document.getElementById('queryButton').disabled = true;
+});
   
   changesTreeEl.appendChild(ul);
 }
@@ -385,7 +501,13 @@ function parseDiff(diffText) {
           type: 'file-header', 
           content: `📄 ${currentFile}`, 
           file: currentFile 
-        });
+            document.getElementById('indexButton').addEventListener('click', ragIndex);
+    document.getElementById('queryButton').addEventListener('click', ragQuery);
+
+    // Initially disable RAG buttons
+    document.getElementById('indexButton').disabled = true;
+    document.getElementById('queryButton').disabled = true;
+});
       }
     } else if (line.startsWith('@@')) {
       // Hunk header - extract line numbers but show cleaner separator
@@ -400,7 +522,13 @@ function parseDiff(diffText) {
           type: 'separator', 
           content: '⋯', 
           lineNum: null 
-        });
+            document.getElementById('indexButton').addEventListener('click', ragIndex);
+    document.getElementById('queryButton').addEventListener('click', ragQuery);
+
+    // Initially disable RAG buttons
+    document.getElementById('indexButton').disabled = true;
+    document.getElementById('queryButton').disabled = true;
+});
       }
     } else if (line.startsWith('+') && !line.startsWith('+++')) {
       // Added line - clean display
@@ -409,7 +537,13 @@ function parseDiff(diffText) {
         content: line.substring(1), 
         lineNum: lineNumNew++,
         prefix: '+'
-      });
+          document.getElementById('indexButton').addEventListener('click', ragIndex);
+    document.getElementById('queryButton').addEventListener('click', ragQuery);
+
+    // Initially disable RAG buttons
+    document.getElementById('indexButton').disabled = true;
+    document.getElementById('queryButton').disabled = true;
+});
     } else if (line.startsWith('-') && !line.startsWith('---')) {
       // Removed line - clean display
       parsed.push({ 
@@ -417,7 +551,13 @@ function parseDiff(diffText) {
         content: line.substring(1), 
         lineNum: lineNumOld++,
         prefix: '-'
-      });
+          document.getElementById('indexButton').addEventListener('click', ragIndex);
+    document.getElementById('queryButton').addEventListener('click', ragQuery);
+
+    // Initially disable RAG buttons
+    document.getElementById('indexButton').disabled = true;
+    document.getElementById('queryButton').disabled = true;
+});
     } else if (line.startsWith(' ')) {
       // Context line - only show for actual changes
       parsed.push({ 
@@ -426,10 +566,22 @@ function parseDiff(diffText) {
         lineNumOld: lineNumOld++,
         lineNumNew: lineNumNew++,
         prefix: ' '
-      });
+          document.getElementById('indexButton').addEventListener('click', ragIndex);
+    document.getElementById('queryButton').addEventListener('click', ragQuery);
+
+    // Initially disable RAG buttons
+    document.getElementById('indexButton').disabled = true;
+    document.getElementById('queryButton').disabled = true;
+});
     }
     // Skip other headers like '+++', '---', 'index', 'new file mode', etc.
-  });
+      document.getElementById('indexButton').addEventListener('click', ragIndex);
+    document.getElementById('queryButton').addEventListener('click', ragQuery);
+
+    // Initially disable RAG buttons
+    document.getElementById('indexButton').disabled = true;
+    document.getElementById('queryButton').disabled = true;
+});
   
   return parsed;
 }
@@ -493,7 +645,13 @@ async function downloadWorkspace(format = 'zip') {
     console.log(`Attempting to download workspace as ${format}`);
     const response = await fetch(`${base()}/v1/workspaces/${state.workspace}/download?format=${format}`, {
       method: 'POST'
-    });
+        document.getElementById('indexButton').addEventListener('click', ragIndex);
+    document.getElementById('queryButton').addEventListener('click', ragQuery);
+
+    // Initially disable RAG buttons
+    document.getElementById('indexButton').disabled = true;
+    document.getElementById('queryButton').disabled = true;
+});
     
     if (!response.ok) {
       if (response.status === 404) {
@@ -564,7 +722,13 @@ async function commitAndPush() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(requestBody)
-    });
+        document.getElementById('indexButton').addEventListener('click', ragIndex);
+    document.getElementById('queryButton').addEventListener('click', ragQuery);
+
+    // Initially disable RAG buttons
+    document.getElementById('indexButton').disabled = true;
+    document.getElementById('queryButton').disabled = true;
+});
     
     const data = await response.json();
     console.log('Commit/push response:', data);
@@ -644,7 +808,13 @@ function initMonaco() {
         scrollBeyondLastLine: false,
         renderWhitespace: 'selection',
         fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Monaco, Consolas, "Liberation Mono", monospace'
-      });
+          document.getElementById('indexButton').addEventListener('click', ragIndex);
+    document.getElementById('queryButton').addEventListener('click', ragQuery);
+
+    // Initially disable RAG buttons
+    document.getElementById('indexButton').disabled = true;
+    document.getElementById('queryButton').disabled = true;
+});
       
       state.monacoLoaded = true;
       monacoEl.hidden = false;
@@ -654,7 +824,13 @@ function initMonaco() {
       if (state.currentFile) {
         openFile(state.currentFile);
       }
-    });
+        document.getElementById('indexButton').addEventListener('click', ragIndex);
+    document.getElementById('queryButton').addEventListener('click', ragQuery);
+
+    // Initially disable RAG buttons
+    document.getElementById('indexButton').disabled = true;
+    document.getElementById('queryButton').disabled = true;
+});
   } catch (error) {
     console.error('Monaco initialization failed:', error);
     // Keep fallback visible
@@ -856,7 +1032,13 @@ function updateBreadcrumbs(path) {
       elements.push(`<a href="#" data-path="${currentPath}">${part}</a>`);
       elements.push('<span class="separator">/</span>');
     }
-  });
+      document.getElementById('indexButton').addEventListener('click', ragIndex);
+    document.getElementById('queryButton').addEventListener('click', ragQuery);
+
+    // Initially disable RAG buttons
+    document.getElementById('indexButton').disabled = true;
+    document.getElementById('queryButton').disabled = true;
+});
   
   breadcrumbs.innerHTML = `<span>${elements.join('')}</span>`;
   
@@ -865,8 +1047,20 @@ function updateBreadcrumbs(path) {
     link.addEventListener('click', (e) => {
       e.preventDefault();
       // Could implement folder navigation here
-    });
-  });
+        document.getElementById('indexButton').addEventListener('click', ragIndex);
+    document.getElementById('queryButton').addEventListener('click', ragQuery);
+
+    // Initially disable RAG buttons
+    document.getElementById('indexButton').disabled = true;
+    document.getElementById('queryButton').disabled = true;
+});
+      document.getElementById('indexButton').addEventListener('click', ragIndex);
+    document.getElementById('queryButton').addEventListener('click', ragQuery);
+
+    // Initially disable RAG buttons
+    document.getElementById('indexButton').disabled = true;
+    document.getElementById('queryButton').disabled = true;
+});
 }
 
 // Tree operations
@@ -954,7 +1148,13 @@ function renderTreeNode(node, parentEl, prefix) {
     // Directories first, then alphabetical
     if (nodeA.file === nodeB.file) return nameA.localeCompare(nameB);
     return nodeA.file ? 1 : -1;
-  });
+      document.getElementById('indexButton').addEventListener('click', ragIndex);
+    document.getElementById('queryButton').addEventListener('click', ragQuery);
+
+    // Initially disable RAG buttons
+    document.getElementById('indexButton').disabled = true;
+    document.getElementById('queryButton').disabled = true;
+});
   
   for (const [name, child] of entries) {
     const li = document.createElement("li");
@@ -972,7 +1172,13 @@ function renderTreeNode(node, parentEl, prefix) {
           e.preventDefault();
           openFile(`${prefix}${name}`);
         }
-      });
+          document.getElementById('indexButton').addEventListener('click', ragIndex);
+    document.getElementById('queryButton').addEventListener('click', ragQuery);
+
+    // Initially disable RAG buttons
+    document.getElementById('indexButton').disabled = true;
+    document.getElementById('queryButton').disabled = true;
+});
       
       parentEl.appendChild(li);
     } else {
@@ -1000,7 +1206,13 @@ function renderTreeNode(node, parentEl, prefix) {
         if (e.target === li || e.target === span) {
           toggle();
         }
-      });
+          document.getElementById('indexButton').addEventListener('click', ragIndex);
+    document.getElementById('queryButton').addEventListener('click', ragQuery);
+
+    // Initially disable RAG buttons
+    document.getElementById('indexButton').disabled = true;
+    document.getElementById('queryButton').disabled = true;
+});
       
       li.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' || e.key === ' ') {
@@ -1011,7 +1223,13 @@ function renderTreeNode(node, parentEl, prefix) {
         } else if (e.key === 'ArrowLeft' && li.getAttribute('aria-expanded') === 'true') {
           toggle();
         }
-      });
+          document.getElementById('indexButton').addEventListener('click', ragIndex);
+    document.getElementById('queryButton').addEventListener('click', ragQuery);
+
+    // Initially disable RAG buttons
+    document.getElementById('indexButton').disabled = true;
+    document.getElementById('queryButton').disabled = true;
+});
       
       parentEl.appendChild(li);
       parentEl.appendChild(subUl);
@@ -1031,7 +1249,13 @@ function selectTreeItem(path) {
   if (item) {
     item.classList.add('selected');
     state.selectedTreeItem = item;
-    item.scrollIntoView({ block: 'nearest' });
+    item.scrollIntoView({ block: 'nearest'     document.getElementById('indexButton').addEventListener('click', ragIndex);
+    document.getElementById('queryButton').addEventListener('click', ragQuery);
+
+    // Initially disable RAG buttons
+    document.getElementById('indexButton').disabled = true;
+    document.getElementById('queryButton').disabled = true;
+});
   }
 }
 
@@ -1057,7 +1281,13 @@ function addChatBubble(role, text, timestamp = new Date()) {
   messages.scrollTop = messages.scrollHeight;
   
   // Add to history
-  state.chatHistory.push({ role, text, timestamp });
+  state.chatHistory.push({ role, text, timestamp     document.getElementById('indexButton').addEventListener('click', ragIndex);
+    document.getElementById('queryButton').addEventListener('click', ragQuery);
+
+    // Initially disable RAG buttons
+    document.getElementById('indexButton').disabled = true;
+    document.getElementById('queryButton').disabled = true;
+});
 }
 
 function addStreamingBubble() {
@@ -1131,7 +1361,13 @@ async function sendPrompt() {
         workspace: state.workspace,
         chatHistory: chatContext
       })
-    });
+        document.getElementById('indexButton').addEventListener('click', ragIndex);
+    document.getElementById('queryButton').addEventListener('click', ragQuery);
+
+    // Initially disable RAG buttons
+    document.getElementById('indexButton').disabled = true;
+    document.getElementById('queryButton').disabled = true;
+});
     
     const data = await response.json();
     
@@ -1177,7 +1413,13 @@ async function uploadWorkspace() {
     const response = await apiCall("/v1/workspaces/upload", {
       method: "POST",
       body: formData
-    });
+        document.getElementById('indexButton').addEventListener('click', ragIndex);
+    document.getElementById('queryButton').addEventListener('click', ragQuery);
+
+    // Initially disable RAG buttons
+    document.getElementById('indexButton').disabled = true;
+    document.getElementById('queryButton').disabled = true;
+});
     
     const data = await response.json();
     if (data.workspace_id) {
@@ -1203,7 +1445,13 @@ async function cloneRepository() {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ repo_url: repoUrl, branch })
-    });
+        document.getElementById('indexButton').addEventListener('click', ragIndex);
+    document.getElementById('queryButton').addEventListener('click', ragQuery);
+
+    // Initially disable RAG buttons
+    document.getElementById('indexButton').disabled = true;
+    document.getElementById('queryButton').disabled = true;
+});
     
     const data = await response.json();
     if (data.workspace_id) {
@@ -1252,7 +1500,13 @@ document.addEventListener("DOMContentLoaded", () => {
       const f = e.target.files && e.target.files[0];
       const nameEl = $("zipName");
       if (nameEl) nameEl.textContent = f ? f.name : "No file chosen";
-    });
+        document.getElementById('indexButton').addEventListener('click', ragIndex);
+    document.getElementById('queryButton').addEventListener('click', ragQuery);
+
+    // Initially disable RAG buttons
+    document.getElementById('indexButton').disabled = true;
+    document.getElementById('queryButton').disabled = true;
+});
   }
   if (savedWorkspace) {
     $("ws").value = savedWorkspace;
@@ -1276,7 +1530,13 @@ document.addEventListener("DOMContentLoaded", () => {
     } else {
       showToast("Please enter a workspace ID", "warning");
     }
-  });
+      document.getElementById('indexButton').addEventListener('click', ragIndex);
+    document.getElementById('queryButton').addEventListener('click', ragQuery);
+
+    // Initially disable RAG buttons
+    document.getElementById('indexButton').disabled = true;
+    document.getElementById('queryButton').disabled = true;
+});
   
   // Main app workspace operations
   $("treeBtn").addEventListener('click', refreshTree);
@@ -1287,7 +1547,13 @@ document.addEventListener("DOMContentLoaded", () => {
     $("repoUrl").value = '';
     $("branch").value = 'main';
     $("ws").value = '';
-  });
+      document.getElementById('indexButton').addEventListener('click', ragIndex);
+    document.getElementById('queryButton').addEventListener('click', ragQuery);
+
+    // Initially disable RAG buttons
+    document.getElementById('indexButton').disabled = true;
+    document.getElementById('queryButton').disabled = true;
+});
   $("cloneNewBtn").addEventListener('click', () => {
     showWelcomeScreen();
     // Clear previous selections
@@ -1295,13 +1561,25 @@ document.addEventListener("DOMContentLoaded", () => {
     $("repoUrl").value = '';
     $("branch").value = 'main';
     $("ws").value = '';
-  });
+      document.getElementById('indexButton').addEventListener('click', ragIndex);
+    document.getElementById('queryButton').addEventListener('click', ragQuery);
+
+    // Initially disable RAG buttons
+    document.getElementById('indexButton').disabled = true;
+    document.getElementById('queryButton').disabled = true;
+});
   
   // Dropdown functionality
   $("downloadDropdownBtn").addEventListener('click', (e) => {
     e.stopPropagation();
     toggleDropdown('downloadDropdown');
-  });
+      document.getElementById('indexButton').addEventListener('click', ragIndex);
+    document.getElementById('queryButton').addEventListener('click', ragQuery);
+
+    // Initially disable RAG buttons
+    document.getElementById('indexButton').disabled = true;
+    document.getElementById('queryButton').disabled = true;
+});
   
   // Tree tab switching
   $("filesTab").addEventListener('click', () => switchTreeTab('files'));
@@ -1311,11 +1589,23 @@ document.addEventListener("DOMContentLoaded", () => {
   $("downloadZipBtn").addEventListener('click', () => {
     downloadWorkspace('zip');
     hideAllDropdowns();
-  });
+      document.getElementById('indexButton').addEventListener('click', ragIndex);
+    document.getElementById('queryButton').addEventListener('click', ragQuery);
+
+    // Initially disable RAG buttons
+    document.getElementById('indexButton').disabled = true;
+    document.getElementById('queryButton').disabled = true;
+});
   $("downloadDiffBtn").addEventListener('click', () => {
     downloadWorkspace('diff');
     hideAllDropdowns();
-  });
+      document.getElementById('indexButton').addEventListener('click', ragIndex);
+    document.getElementById('queryButton').addEventListener('click', ragQuery);
+
+    // Initially disable RAG buttons
+    document.getElementById('indexButton').disabled = true;
+    document.getElementById('queryButton').disabled = true;
+});
   
   // Git operations
   $("commitBtn").addEventListener('click', showCommitModal);
@@ -1334,12 +1624,24 @@ document.addEventListener("DOMContentLoaded", () => {
         loadWorkspace(workspaceId);
       }
     }
-  });
+      document.getElementById('indexButton').addEventListener('click', ragIndex);
+    document.getElementById('queryButton').addEventListener('click', ragQuery);
+
+    // Initially disable RAG buttons
+    document.getElementById('indexButton').disabled = true;
+    document.getElementById('queryButton').disabled = true;
+});
   
   // Base URL
   $("baseUrl").addEventListener('change', (e) => {
     localStorage.setItem('baseUrl', e.target.value);
-  });
+      document.getElementById('indexButton').addEventListener('click', ragIndex);
+    document.getElementById('queryButton').addEventListener('click', ragQuery);
+
+    // Initially disable RAG buttons
+    document.getElementById('indexButton').disabled = true;
+    document.getElementById('queryButton').disabled = true;
+});
   
   // Chat
   $("runBtn").addEventListener('click', sendPrompt);
@@ -1348,7 +1650,13 @@ document.addEventListener("DOMContentLoaded", () => {
       e.preventDefault();
       sendPrompt();
     }
-  });
+      document.getElementById('indexButton').addEventListener('click', ragIndex);
+    document.getElementById('queryButton').addEventListener('click', ragQuery);
+
+    // Initially disable RAG buttons
+    document.getElementById('indexButton').disabled = true;
+    document.getElementById('queryButton').disabled = true;
+});
   
   $("prompt").addEventListener('input', autoResizeTextarea);
   
@@ -1360,12 +1668,24 @@ document.addEventListener("DOMContentLoaded", () => {
     if (e.key === 'Escape') {
       hideAllDropdowns();
     }
-  });
+      document.getElementById('indexButton').addEventListener('click', ragIndex);
+    document.getElementById('queryButton').addEventListener('click', ragQuery);
+
+    // Initially disable RAG buttons
+    document.getElementById('indexButton').disabled = true;
+    document.getElementById('queryButton').disabled = true;
+});
   
   // Click outside to close dropdowns
   document.addEventListener('click', () => {
     hideAllDropdowns();
-  });
+      document.getElementById('indexButton').addEventListener('click', ragIndex);
+    document.getElementById('queryButton').addEventListener('click', ragQuery);
+
+    // Initially disable RAG buttons
+    document.getElementById('indexButton').disabled = true;
+    document.getElementById('queryButton').disabled = true;
+});
   
   // Global keyboard shortcuts
   document.addEventListener('keydown', (e) => {
@@ -1380,10 +1700,22 @@ document.addEventListener("DOMContentLoaded", () => {
       e.preventDefault();
       $("prompt").focus();
     }
-  });
+      document.getElementById('indexButton').addEventListener('click', ragIndex);
+    document.getElementById('queryButton').addEventListener('click', ragQuery);
+
+    // Initially disable RAG buttons
+    document.getElementById('indexButton').disabled = true;
+    document.getElementById('queryButton').disabled = true;
+});
   
   // Initialize Monaco after a short delay
   setTimeout(initMonaco, 100);
+    document.getElementById('indexButton').addEventListener('click', ragIndex);
+    document.getElementById('queryButton').addEventListener('click', ragQuery);
+
+    // Initially disable RAG buttons
+    document.getElementById('indexButton').disabled = true;
+    document.getElementById('queryButton').disabled = true;
 });
 
 // Handle visibility change to refresh on return
@@ -1391,6 +1723,12 @@ document.addEventListener('visibilitychange', () => {
   if (!document.hidden && state.workspace) {
     checkHealth();
   }
+    document.getElementById('indexButton').addEventListener('click', ragIndex);
+    document.getElementById('queryButton').addEventListener('click', ragQuery);
+
+    // Initially disable RAG buttons
+    document.getElementById('indexButton').disabled = true;
+    document.getElementById('queryButton').disabled = true;
 });
 
 // Add event listener
