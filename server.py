@@ -296,6 +296,23 @@ def git_status(ws_id: str):
         raise HTTPException(500, f"Git command failed: {e.stderr}")
 
 @app.get("/v1/workspaces/{ws_id}/git/diff")
+
+class RagIndexRequest(BaseModel):
+    paths: list[str]
+    glob: bool = False
+    chunk_size: int = 512
+
+class RagQueryRequest(BaseModel):
+    q: str
+    k: int = 5
+
+@app.post("/v1/workspaces/{ws_id}/rag/index")
+def rag_index(ws_id: str, body: RagIndexRequest):
+    raise HTTPException(501, "RAG indexing not wired yet")
+
+@app.post("/v1/workspaces/{ws_id}/rag/query")
+def rag_query(ws_id: str, body: RagQueryRequest):
+    raise HTTPException(501, "RAG querying not wired yet")
 def git_diff(ws_id: str, path: Optional[str] = None):
     """Get git diff for a specific file or all files"""
     ws_root = os.path.join(WORKSPACES_BASE, ws_id)
