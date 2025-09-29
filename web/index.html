@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Zillo</title>
   <link rel="stylesheet" href="styles.css" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
 </head>
 <body>
   <div class="root">
@@ -28,7 +31,11 @@
                 <h3>Upload Project</h3>
                 <p>Upload a ZIP file containing your project</p>
                 <div class="upload-area">
-                  <input id="zipFile" type="file" accept=".zip" aria-label="Upload ZIP file" />
+                  <label class="file-input">
+                    <input id="zipFile" type="file" accept=".zip" aria-label="Upload ZIP file" />
+                    <span class="file-label">Choose ZIP</span>
+                    <span id="zipName" class="file-name">No file chosen</span>
+                  </label>
                   <button id="uploadBtn" class="primary">Upload ZIP</button>
                 </div>
               </div>
@@ -48,22 +55,24 @@
               </div>
             </div>
             
-            <!-- Existing Workspace -->
-            <div class="existing-workspace">
-              <h3>Continue with existing workspace</h3>
-              <div class="workspace-input">
-                <input id="ws" type="text" placeholder="Enter workspace ID" aria-label="Workspace ID" />
-                <button id="loadWorkspaceBtn">Load</button>
+            <!-- Existing Workspace + Server Config side-by-side -->
+            <div class="setup-bottom">
+              <div class="existing-workspace">
+                <h3>Continue with existing workspace</h3>
+                <div class="workspace-input">
+                  <input id="ws" type="text" placeholder="Enter workspace ID" aria-label="Workspace ID" />
+                  <button id="loadWorkspaceBtn">Load</button>
+                </div>
               </div>
-            </div>
-          </div>
-          
-          <div class="server-config">
-            <h3>Server Configuration</h3>
-            <div class="server-input">
-              <input id="baseUrl" type="text" value="https://agents-assistant-qwcl.onrender.com" />
-              <button id="healthBtn">Check</button>
-              <span id="healthBadge"></span>
+
+              <div class="server-config">
+                <h3>Server Configuration</h3>
+                <div class="server-input">
+                  <input id="baseUrl" type="text" value="https://agents-assistant-qwcl.onrender.com" />
+                  <button id="healthBtn">Check</button>
+                  <span id="healthBadge"></span>
+                </div>
+              </div>
             </div>
           </div>
         </div>

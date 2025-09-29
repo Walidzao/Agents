@@ -716,7 +716,7 @@ function guessLanguage(path) {
 
 // File operations
 async function openFile(path) {
-  if (!state.workspace || !path) return;
+  if (!state.workspace || path === undefined || path === null) return;
   
   state.currentFile = path;
   updateBreadcrumbs(path);
@@ -751,6 +751,9 @@ async function openFile(path) {
         renderCode(data.content, path);
         $("activePath").textContent = path.split('/').pop() || path;
         selectTreeItem(path);
+      } else if (data && data.is_directory) {
+        renderCode(data.message, path);
+        $("activePath").textContent = path.split('/').pop() || path;
       }
     }
   } catch (error) {
@@ -1379,4 +1382,12 @@ document.addEventListener('visibilitychange', () => {
   if (!document.hidden && state.workspace) {
     checkHealth();
   }
+});
+
+// Add event listener
+$("resetBtn").addEventListener('click', () => {
+    if (confirm('Reset workspace? This will clear local storage and show welcome screen.')) {
+        localStorage.removeItem('workspace');
+        location.reload();
+    }
 });

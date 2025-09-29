@@ -139,6 +139,8 @@ def read_file(ws_id: str, path: str = Query(...)):
     if not abs_path.startswith(base_real + os.sep):
         raise HTTPException(400, "Bad path")
     if not os.path.isfile(abs_path):
+        if os.path.isdir(abs_path):
+            return {"is_directory": True, "message": "This is a directory. Select a file to view its content."}
         raise HTTPException(404, "Not found")
     with open(abs_path, "rb") as f:
         data = f.read(2_000_000)
